@@ -1,0 +1,253 @@
+---
+date: "2025-10-13"
+output:
+  html_document:
+    toc: false
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+meta <- rmarkdown::metadata
+title_text <- "Beauveria bassiana" # manually set since we removed YAML title
+date_text <- meta$date
+```
+
+::: {style="text-align; margin-bottom: 1em;"}
+# *`r title_text`*
+
+**Date:** `r format(as.Date(date_text), "%B %d, %Y")`
+:::
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+packages <- c(
+  "rinat", "dplyr", "sf", "ggplot2",
+  "rnaturalearth", "rnaturalearthdata",
+  "lubridate", "devtools"
+)
+
+# Install any that aren't already installed
+installed <- packages %in% installed.packages()
+if (any(!installed)) {
+  install.packages(packages[!installed])
+}
+
+# Load all packages
+lapply(packages, library, character.only = TRUE)
+```
+
+------------------------------------------------------------------------
+
+## 1. Taxonomy & Nomenclature
+
+-   **Scientific Name (current):** *Beauveria bassiana*
+-   **Synonyms / Former Names:** *Botrytis bassiana*
+-   **Common Name(s):** White muscardine fungus or Icing Sugar Fungus
+-   **Taxonomic Authority / Citation:** (Bassi 1835)
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(knitr)
+library(kableExtra)
+
+# Create the classification table
+
+classification <- data.frame(
+Rank = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus"),
+Name = c("Fungi", "Ascomycota", "Ascomycetes", "Hypocreales", "Cordycipitaceae", "Beauveria")
+)
+
+# Render sleek table
+
+kable(classification, format = "html", escape = FALSE, align = c("l","l")) %>%
+kable_styling(
+bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+full_width = FALSE,
+position = "center",
+font_size = 16
+) %>%
+row_spec(6, bold = TRUE, italic = TRUE, color = "#2c3e50") %>% # emphasize Genus
+column_spec(1, bold = TRUE, color = "black") %>% # style Rank column
+add_header_above(c("Scientific Classification" = 2))
+```
+
+------------------------------------------------------------------------
+
+## 2. Morphology & Identification
+
+-   **Fruiting Body Description: White, fluffy mold that grows on a host** (size, shape, color, texture)
+-   **Cap / Pileus Characteristics:** This fungi does not have a cap
+-   **Gills / Pores / Spines / Teeth / Etc.:** This fungi does not have gills, pores, spines, or teeth
+-   **Stipe / Stem / Attachment / Ring / Volva / Base:** This fungi does not have a fruiting body with any of these morphological features
+-   **Spore Print Color:** White or yellowish white
+-   **Microscopic Features (if available):** Produces white spore balls made of single-celled conidia. Has conidiogenous cells that are short, ovoid, and have a rachis; septate hyphae.
+-   **Other Diagnostic Characters:** This fungi is powdery while sporulating.
+-   **Similar Species / Potential Confusions:** Can be confused with *Metarhizium* and *Akanthomyces* species as well as other *Beauveria* species
+
+------------------------------------------------------------------------
+
+## 3. Distribution & Habitat in Washington
+
+-   **Range (counties or regions):** Distributed worldwide, generally seems to be more abundant on coasts and islands. Found from Everett down to Chehalis
+-   **Geographic Distribution in WA:** Distributed mostly along the Western side of Washington
+-   **Elevation Range:** Mainly found at low to mid elevations, seems to be found in forested areas
+-   **Habitat Types / Substrate Preferences:** Occurs in soil, prefers humid, temperate climates
+-   **Host Associations (if applicable): often seen on insects (ants, beetles, moths, worms, bees), has been observed on reptiles**
+
+```{r Distribution-map-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# 1. Get records by taxon_id (Beauveria bassiana = 862160)
+beauveria_data <- get_inat_obs(taxon_id = 862160, maxresults = 10000)
+
+# 2. Convert to sf object
+beauveria_sf <- beauveria_data %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# 3. Get WA state polygon
+wa_state <- ne_states(country = "United States of America", returnclass = "sf") %>%
+  filter(name == "Washington") %>%
+  st_transform(st_crs(beauveria_sf))
+
+# 4. Keep points inside WA
+beauveria_wa <- beauveria_sf[st_within(beauveria_sf, wa_state, sparse = FALSE), ]
+
+# 5. Plot
+ggplot() +
+  geom_sf(data = wa_state, fill = "gray95", color = "black") +
+  geom_sf(data = beauveria_wa, color = "purple", alpha = 0.6, size = 2) +
+  labs(
+    title = "iNaturalist Observations of Beauveria bassiana in Washington State",
+    caption = "Data source: iNaturalist"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 4. Seasonality & Phenology
+
+-   **Months of Fruiting in WA:** Has been most observed from June to October
+-   **Seasonal Notes:** Peaks in warm, moist weather during these months
+
+```{r Seasonality-plot-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Make sure your date column is parsed
+beauveria_data <- beauveria_wa %>%
+  mutate(
+    observed_on = as.Date(observed_on),
+    month_num = month(observed_on),
+    month_label = month(observed_on, label = TRUE, abbr = TRUE)
+  ) %>%
+  filter(!is.na(month_num))
+
+# Aggregate by month
+monthly_counts <- beauveria_data %>%
+  group_by(month_num, month_label) %>%
+  summarize(observations = n(), .groups = "drop")
+
+# Make sure months are in calendar order
+monthly_counts <- monthly_counts %>%
+  arrange(month_num)
+
+#make proportional
+monthly_counts <- monthly_counts %>%
+  mutate(freq = observations / sum(observations))
+
+# Plot
+ggplot(monthly_counts, aes(x = month_num, y = freq)) +
+  geom_area(fill = "orchid4", alpha = 0.5) +
+  geom_line(color = "purple4", size = 1.2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = expression("Seasonal Pattern of " * italic("Beauveria bassiana") * " (Relative Frequency)"),
+    x = "Month",
+    y = "Proportion of Observations"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 5. Ecology & Role
+
+-   **Ecological Function:** Saprotroph and/or parasite
+-   **Substrate / Decomposition Role:** lives in soil, finds insect as a host, takes over insect body, and eventually decomposes it
+-   **Interactions:** Interacts with insects
+-   **Environmental Sensitivity / Indicators:** As the weather gets warmer due to climate change, this fungi will likely become more abundant
+
+------------------------------------------------------------------------
+
+## 6. Conservation, Abundance & Threats
+
+-   **Abundance / Rarity in WA:** Seems to be moderately abundant in WA
+-   **Conservation Status (state, federal, red list):** Does not have a global conservation status, is listed as vulnerable in Alberta and Manitoba, CA
+-   **Threats / Pressures:** Climate change, fungi does well in warm, moist environments
+-   **Management or Monitoring Notes:** Does not seem to be managed or monitored at this time, not seen as a threat
+
+------------------------------------------------------------------------
+
+## 7. Use / Ethnobiology / Toxicology
+
+-   **Edibility / Toxicity:** Not edible, spores may worsen breathing difficulties, at least one case of human infection has been reported in a person with a suppressed immune system
+-   **Traditional / Cultural Uses:** Commonly used for pest control
+-   **Medicinal / Bioactive Compounds:** This fungus is a contact mycoinsecticide that is registered for use in the US on pests and agricultural and horticultural crops
+-   **Cautions / Warnings:** Can be harmful to humans if ingested and can cause eye irritation. Could harm pollinators and other beneficial insects as well as fish.
+
+------------------------------------------------------------------------
+
+## 8. References / Further Reading
+
+-   Key Literature Sources:
+-   Field Guides / Online Resources: <https://cals.cornell.edu/integrated-pest-management/outreach-education/fact-sheets/beauveria-bassiana> <https://en.wikipedia.org/wiki/Beauveria_bassiana> <https://explorer.natureserve.org/Taxon/ELEMENT_GLOBAL.2.1072881/Beauveria_bassiana> <https://www.gbif.org/occurrence/charts?has_coordinate=true&has_geospatial_issue=false&taxon_key=2560612&geometry=POLYGON>((-124.72585%2043.56442,-113.47585%2043.56442,-113.47585%2051.44445,-118.65434%2051.44445,-124.72585%2051.44445,-124.72585%2043.56442))&occurrence_status=present <https://www.inaturalist.org/taxa/862160-Beauveria-bassiana#status-tab>
+-   Herbarium / Specimen Records (if applicable):
+
+------------------------------------------------------------------------
+
+## 9. Images / Illustrations
+
+-   **Fruiting Body Photos:**\
+    ![Fruiting body](1746008125_a5c5728912e157e787cc.jpg)
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description; Photo credit: Photographer Name
+
+    </p>
+
+    ![Fruiting body](dc3eeae2-f785-41ab-bc1e-da27d472b60c.jpg)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description; Photo credit: Photographer Name
+
+    </p>
+
+-   **Habitat Photo:**
+
+    ![Habitat](clavi10b.jpg)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description; Photo credit: Photographer Name
+
+    </p>
+
+-   **Microscopy Photo (if available):**
+
+    ![Microscopy](A-Beauveria-bassiana-conidiophores-and-conidia-B-B-bassiana-in-Sabouraud-dextrose.png)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description, Photo credit: Photographer Name
+
+    </p>
+
+------------------------------------------------------------------------
+
+## 10. Other Notes & Observations
+
+-   **Field Notes / Observations:** Looking at iNaturalist observations most recorded findings of this fungi in Washington state have been in natural areas or forests and have been seen mainly on insects.
+-   **Questions / Uncertainties:** Will it eventually become harmful to use this fungi as a pesticide?
+-   **Fun facts:** This fungus is a cordiceps and can kill insects within 4-10 days. It is able to infect 700 different species of insects and can colonize plants to help them resist pests.
+
+------------------------------------------------------------------------

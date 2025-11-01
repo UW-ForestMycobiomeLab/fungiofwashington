@@ -1,0 +1,27 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "Fungi of Washington"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: all_fungi.qmd
+        text: Browse All
+      - href: foraging_map.qmd
+        text: Mushroom Collection (WA)
+
+  search: true
+
+format:
+  html:
+    theme: flatly
+    toc: true
+
+# Only render these pages
+render:
+  - index.qmd
+  - all_fungi.qmd
+  - foraging_map.qmd

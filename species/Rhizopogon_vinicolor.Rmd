@@ -1,0 +1,329 @@
+---
+date: "2025-10-13"
+output:
+  html_document:
+    toc: false
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+meta <- rmarkdown::metadata
+title_text <- "Rhizopogon vinicolor" # manually set since we removed YAML title
+date_text <- meta$date
+```
+
+::: {style="text-align; margin-bottom: 1em;"}
+# *`r title_text`*
+
+**Date:** `r format(as.Date(date_text), "%B %d, %Y")`
+:::
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+packages <- c(
+  "rinat", "dplyr", "sf", "ggplot2",
+  "rnaturalearth", "rnaturalearthdata",
+  "lubridate", "devtools"
+)
+
+# Install any that aren't already installed
+installed <- packages %in% installed.packages()
+if (any(!installed)) {
+  install.packages(packages[!installed])
+}
+
+# Load all packages
+lapply(packages, library, character.only = TRUE)
+```
+
+------------------------------------------------------------------------
+
+## 1. Taxonomy & Nomenclature
+
+-   **Scientific Name (current):** *Rhizopogon vinicolor*
+
+-   **Synonyms / Former Names:** NA
+
+-   **Common Name(s):** Wine-colored Pogie
+
+-   **Taxonomic Authority / Citation:** Mycobank
+
+-   **Higher Classification (Kingdom / Phylum / Class / Order / Family):\
+    **Fungi -\> Dikarya -\> Basidiomycota -\> Agaricomycotina -\> Agaricomycetes -\> Agaricomycetidae -\> Boletales -\> Rhizopogonaceae -\> Rhizopogon -\> Rhizopogon Vinicolor
+
+------------------------------------------------------------------------
+
+## 2. Morphology & Identification
+
+-   **Fruiting Body Description:**
+
+    -   Size: 10 to 33 mm in diameter
+    -   Shape: rounded or irregularly shaped
+    -   Color: dusty white color and later red
+    -   Texture: few rhizomorphs at the base
+
+-   **Cap / Pileus Characteristics:\
+    **Single layer, becomes wine red when exposed.
+
+-   **Gills / Pores / Spines / Teeth / Etc.:**\
+    Filled with basidiospores.
+
+-   **Stipe / Stem / Attachment / Ring / Volva / Base:**\
+    Base with few rhizomorphs.
+
+-   **Spore Print Color:**\
+    NA
+
+-   **Microscopic Features (if available):** (spore size & shape, cystidia, etc.)
+
+    -   Trama filled with basidiospores
+    -   Basidiospores elliptical to ovid
+    -   5-9 x 3-5 um in size
+    -   Do not have a septum, smooth, and hyaline
+    -   Mycelial cords are few in number of absent altogether
+
+-   **Other Diagnostic Characters:**
+
+    -   Odor: slightly fruity
+    -   Bruising reactions: becomes vinaceous when exposed or bruised
+    -   Color change: peridium becomes wine red when exposed. The body starts as a dirty color with tinges of yellow and staining pink, then becomes wine red.
+    -   Texture: rubbery
+
+-   **Similar Species / Potential Confusions:**
+
+    -   *Rhizopogon vesiculosus,* and some species of *Amanita* (early in their life cycles)
+
+------------------------------------------------------------------------
+
+## 3. Distribution & Habitat in Washington
+
+-   **Range (counties or regions):**\
+    Clatlam, Snohomish, Kitsap, Pierce, Thurston, Lewis, Cowlitz, Clark, Skamania, Klickitat, Kittilas, Pend Oreille
+
+-   **Geographic Distribution in WA:**\
+    Western Coastal Washington and Central Cascades
+
+-   **Elevation Range:**\
+    Wide elevation range: sea level to 610m (Western Washington) and up to 1520 m (Central Cascades)
+
+-   **Habitat Types / Substrate Preferences:** (forest type, soil, leaf litter, dead wood, etc.)
+
+    Old growth Douglas fir stands, soil, roots
+
+-   **Host Associations (if applicable):**
+
+    Douglas fir
+
+```{r Distribution-map-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# 1. Get records by taxon_id (Rhizopogon vinicolor =  384122)
+rhizopogon_data <- get_inat_obs(taxon_id = 384122, maxresults = 10000)
+
+# 2. Convert to sf object
+rhizopogon_sf <- rhizopogon_data %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# 3. Get WA state polygon
+wa_state <- ne_states(country = "United States of America", returnclass = "sf") %>%
+  filter(name == "Washington") %>%
+  st_transform(st_crs(rhizopogon_sf))
+
+# 4. Keep points inside WA
+rhizopogon_wa <- rhizopogon_sf[st_within(rhizopogon_sf, wa_state, sparse = FALSE), ]
+
+# 5. Plot
+ggplot() +
+  geom_sf(data = wa_state, fill = "gray95", color = "black") +
+  geom_sf(data = rhizopogon_wa, color = "purple", alpha = 0.6, size = 2) +
+  labs(
+    title = "iNaturalist Observations of Rhizopogon vinicolor in Washington State",
+    caption = "Data source: iNaturalist"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 4. Seasonality & Phenology
+
+-   **Months of Fruiting in WA:**\
+    The primary fruiting period is in the spring from February to July, but they can be found year round.
+
+-   **Seasonal Notes:** (peak times, moisture dependence, etc.)\
+    Fruiting season is triggered by rain. The best time to look is in the weeks after significant rain has saturated the forest floor. The fungus itself is drought-resistant and can help the host trees survive dry spells.
+
+```{r Seasonality-plot-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Make sure your date column is parsed
+rhizopogon_data <- rhizopogon_wa %>%
+  mutate(
+    observed_on = as.Date(observed_on),
+    month_num = month(observed_on),
+    month_label = month(observed_on, label = TRUE, abbr = TRUE)
+  ) %>%
+  filter(!is.na(month_num))
+
+# Aggregate by month
+monthly_counts <- rhizopogon_data %>%
+  group_by(month_num, month_label) %>%
+  summarize(observations = n(), .groups = "drop")
+
+# Make sure months are in calendar order
+monthly_counts <- monthly_counts %>%
+  arrange(month_num)
+
+#make proportional
+monthly_counts <- monthly_counts %>%
+  mutate(freq = observations / sum(observations))
+
+# Plot
+ggplot(monthly_counts, aes(x = month_num, y = freq)) +
+  geom_area(fill = "orchid4", alpha = 0.5) +
+  geom_line(color = "purple4", size = 1.2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = expression("Seasonal Pattern of " * italic("Rhizopogon vinicolor") * " (Relative Frequency)"),
+    x = "Month",
+    y = "Proportion of Observations"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 5. Ecology & Role
+
+-   **Ecological Function:**\
+    Ectomycorrhizal relationship with Douglas fir, saprotroph.
+
+-   **Substrate / Decomposition Role:**\
+    Saprotrophyic.
+
+-   **Interactions:**
+
+    They have a mutualistic relationship with Douglas firs. They breakdown leaf litter and rotting wood for nutrient availability for the Douglas Firs in exchange for carbohydrates.
+
+    Western red-backed vole feeds on their fruiting bodies, the spores pass through their guts, and are deposited in fecal pellets. These spores remain viable and form associations with uninfected trees. 
+
+-   **Environmental Sensitivity / Indicators:**
+
+    If a forest is clear-cut and the dead wood is removed, *Rhizopogon vinicolor* stops fruiting, the vole population dies out, and newly planted trees fail to thrive. Tree growth is positively associated with the presence of *R. vinicolor*.
+
+------------------------------------------------------------------------
+
+## 6. Conservation, Abundance & Threats
+
+-   **Abundance / Rarity in WA:**\
+    Highly abundant in Douglas fir stands in Washington. 
+
+-   **Conservation Status (state, federal, red list):**\
+    Not of concern
+
+-   **Threats / Pressures:**\
+    Clear-cutting of old-growth Douglas fir stands
+
+-   **Management or Monitoring Notes:**
+
+    Preserve old-growth Douglas firs to maintain the relationship and presence between Douglas firs, voles, and *R. vinicolor*.
+
+------------------------------------------------------------------------
+
+## 7. Use / Ethnobiology / Toxicology
+
+-   **Edibility / Toxicity:**\
+    It is edible, but due to its small size, rubbery/foam-like texture, and mild flavor, some say it requires more effort in the kitchen than the results justify.
+
+-   **Traditional / Cultural Uses:**\
+    No known traditional or cultural uses.
+
+-   **Medicinal / Bioactive Compounds:**\
+    It has the ability to inhibit the growth of certain root pathogens like Phytophthora cinnamomi and Pythium debaryanum. 
+
+-   **Cautions / Warnings:\
+    **Advised not to eat unless you are 100% sure of the identity, as some species of *Amanita*, which are highly toxic and begin life in an egg-shaped sac, may look similar. 
+
+------------------------------------------------------------------------
+
+## 8. References / Further Reading
+
+-   Key Literature Sources: 
+
+    KRETZER, ANNETTE M., et al. “Patterns of vegetative growth and gene flow in rhizopogon vinicolor and R. vesiculosus (Boletales, Basidiomycota).” Molecular Ecology, vol. 14, no. 8, 11 May 2005, pp. 2259–2268, <https://doi.org/10.1111/j.1365-294x.2005.02547.x.> 
+
+    Luoma DL, Frenkel RE, Trappe JM. Fruiting of hypogeous fungi in Oregon Douglas-fir forests: Seasonal and habitat variation. Mycologia. 1991;83(3):335-353. <doi:10.1080/00275514.1991.12026018>
+
+    Zak, B. “Characterization and classification of mycorrhizae of Douglas fir. II. pseudotsuga menziesii + rhizopogon vinicolor.” Canadian Journal of Botany, vol. 49, no. 7, 1 July 1971, pp. 1079–1084, <https://doi.org/10.1139/b71-154.> 
+
+-   Field Guides / Online Resources:
+
+    Trappe, James, and Matt Trappe. “Specific Habitats: Seasonality and Habitat Associations of Some PNW Truffles.” Fruiting Patterns and Habitat Associations of PNW Truffles, 2007, www.natruffling.org/blurbs.htm#:\~:text=Name:%20Cystangium%20vesiculosum,middle%20elevations%20in%20the%20mountains. 
+
+    “Wine-Colored Pogie (Rhizopogon Vinicolor).” iNaturalist, 13 Jan. 2024, www.inaturalist.org/taxa/384122-Rhizopogon-vinicolor#articles-tab. 
+
+-   Herbarium / Specimen Records:
+
+    WTU Herbarium, Burke Museum. “Rhizopogon Vinicolor.” Rhizopogon Vinicolor - Burke Herbarium Image Collection, University of Washington, burkeherbarium.org/imagecollection/taxon.php?Taxon=Rhizopogon+vinicolor. Accessed 23 Oct. 2025. 
+
+------------------------------------------------------------------------
+
+## 9. Images / Illustrations
+
+-   **Fruiting Body Photos:**
+
+    ![]()\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description; Photo credit: Photographer Name
+
+    </p>
+
+    ![]()\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description; Photo credit: Photographer Name
+
+    </p>
+
+-   **Habitat Photo:**
+
+    ![]()\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description; Photo credit: Photographer Name
+
+    </p>
+
+-   **Microscopy Photo (if available):**
+
+    ![]()\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description, Photo credit: Photographer Name
+
+    </p>
+
+------------------------------------------------------------------------
+
+## 10. Other Notes & Observations
+
+-   **Field Notes / Observations:** Some have observed its existence around pines and other firs besides the Doug fir.
+-   **Questions / Uncertainties:**
+    -   Uncertain about the elevation range 
+    -   No cultural importance was written about, but it could exist, just not in the literature. 
+-   **Fun facts**
+    -   *R. vinicolor* can grow under significant water stress and remains active under drought conditions. This leads to increased establishment and survival rate of inoculated tree seedlings on harsh, dry sites. 
+
+    -   *R. vinicolor* can enhance the net photosynthesis of Douglas-fir seedlings. 
+
+    -   *R. vinicolor* is a valuable model organism for studying the population genetics of ectomycorrhizal fungi due to its clear association with Douglas-fir and its distinct genetic markers.
+
+        \
+        \
+        \
+
+------------------------------------------------------------------------

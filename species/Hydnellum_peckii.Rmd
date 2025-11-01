@@ -1,0 +1,310 @@
+---
+date: "2025-10-13"
+output:
+  html_document:
+    toc: false
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+meta <- rmarkdown::metadata
+title_text <- "Hydnellum peckii" # manually set since we removed YAML title
+date_text <- meta$date
+```
+
+::: {style="text-align; margin-bottom: 1em;"}
+# *`r title_text`*
+
+**Date:** `r format(as.Date(date_text), "%B %d, %Y")`
+:::
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+packages <- c(
+  "rinat", "dplyr", "sf", "ggplot2",
+  "rnaturalearth", "rnaturalearthdata",
+  "lubridate", "devtools"
+)
+
+# Install any that aren't already installed
+installed <- packages %in% installed.packages()
+if (any(!installed)) {
+  install.packages(packages[!installed])
+}
+
+# Load all packages
+lapply(packages, library, character.only = TRUE)
+```
+
+------------------------------------------------------------------------
+
+## 1. Taxonomy & Nomenclature
+
+-   **Scientific Name (current):** *Hydnellum peckii*
+
+-   **Synonyms / Former Names:** *Calodon diabolus, Calodon peckii, Hydnellum diabolus*
+
+-   **Common Name(s):** strawberries and cream, the bleeding Hydnellum, the bleeding tooth fungus, the red-juice tooth, the devil's tooth.
+
+-   **Taxonomic Authority / Citation:** *Hydnellum peckii*  Banker, 1912
+
+-   **Higher Classification (Kingdom / Phylum / Class / Order / Family):**
+
+    Kingdom: Fungi / Phylum: Basidiomycota / Class: Agaricomycotina / Order: Thelephorales / Family: Thelephoraceae
+
+------------------------------------------------------------------------
+
+## 2. Morphology & Identification
+
+-   **Fruiting Body Description:** (size, shape, color, texture)\
+    The Fruiting body has a cap decurrently attaching to its stipe. The hymenium is toothed rather than gilled or pored. The majority of the fruiting body is a cream color, that when moist, exude a thick red fluid in droplets, which give it the appearance of bleeding. Often, the fruiting bodies will grow closely together (1).
+
+-   **Cap / Pileus Characteristics:**\
+    The cap is convexed to flat, and is typically uneven, and sometimes depressed in the center. Initially the cap is a cream color but will become a slight brown-red color as it ages. It is covered densely by small hairs that give the fruiting body a velvety texture, but as it ages, the hairs will shed to make the texture smooth (1). 
+
+-   **Gills / Pores / Spines / Teeth / Etc.:**\
+    The underside of the cap is covered in teeth that make up the hymenium, and the stipe is as well. The teeth on the stipe have a pink tinge to the cream color of the cap, which fades to a grayish brown as the fruiting body matures. The stipe is short and thick, and often deformed. Where the stem meets the ground, it takes on a bulbous shape (1). 
+
+-   **Stipe / Stem / Attachment / Ring / Volva / Base:**\
+    The stem is thick, very short, and often deformed. It becomes bulbous where it penetrates the ground, and may root into the soil for several centimeters.
+
+-   **Spore Print Color:**\
+    Brown
+
+-   **Microscopic Features (if available):** (spore size & shape, cystidia, etc.)\
+    Spores generally spherical but with one more pointed end and covered in small nodules. They are about 5 by 4 μm.
+
+-   **Other Diagnostic Characters:** (odor, bruising reactions, latex, color change, etc.)\
+    In original species description, odor described as similar to hickory nuts. Cap is dark brown to black when bruised.
+
+-   **Similar Species / Potential Confusions:**
+
+    *Hydnellum scrobiculatum* (2)
+
+    *Hydnellum diabolus* (1)
+
+------------------------------------------------------------------------
+
+## 3. Distribution & Habitat in Washington
+
+-   **Range (counties or regions):**\
+    North America, Europe, recently discovered in Iran and Korea.
+
+-   **Geographic Distribution in WA:**\
+    In iNaturalist, documented in the Puget Sound trough, coast, Cascade and Olympic mountains as well as a north east Washington.
+
+-   **Elevation Range:**\
+    Found in the lowlands of moist areas of western Washington but has a preference for montane forests.
+
+-   **Habitat Types / Substrate Preferences:** (forest type, soil, leaf litter, dead wood, etc.)
+
+    Prefers to grow solitary, scattered, or clustered, under conifers in boreal forests, that are mountainous or subalpine (1). Namely Sitka spruce, Douglas-fir, western hemlock, and many pine species (2). They tend to grow in the duff, the layer of organic matter that is partially to fully decomposed (2). However they have also been found among mosses (1).
+
+-   **Host Associations (if applicable):**
+
+    *H. peckii* associates with conifer species within its ranges (1). In the Puget Sound area it is associated with Douglas-fir, hemlocks, true firs, and lodgepole pine along the Oregon coast. It forms ectomycorrhizal relationships with these trees.
+
+```{r Distribution-map-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# 1. Get records by taxon_id (Hygrocybe singerii = 118316)
+hydnellum_data <- get_inat_obs(taxon_id = 154949, maxresults = 10000)
+
+# 2. Convert to sf object
+hydnellum_sf <- hydnellum_data %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# 3. Get WA state polygon
+wa_state <- ne_states(country = "United States of America", returnclass = "sf") %>%
+  filter(name == "Washington") %>%
+  st_transform(st_crs(hydnellum_sf))
+
+# 4. Keep points inside WA
+hydnellum_wa <- hydnellum_sf[st_within(hydnellum_sf, wa_state, sparse = FALSE), ]
+
+# 5. Plot
+ggplot() +
+  geom_sf(data = wa_state, fill = "tomato", color = "black") +
+  geom_sf(data = hydnellum_wa, color = "darkred", alpha = 0.6, size = 2) +
+  labs(
+    title = "iNaturalist Observations of Hydnellum peckii in Washington State",
+    caption = "Data source: iNaturalist"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 4. Seasonality & Phenology
+
+-   **Months of Fruiting in WA:** June through November
+
+-   **Seasonal Notes:** The peak fruiting month is October and the lowest months are December through May. Observations increase from June through October. This pattern seems partially influenced by moisture but also other factors.
+
+```{r Seasonality-plot-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Make sure your date column is parsed
+hydnellum_data <- hydnellum_wa %>%
+  mutate(
+    observed_on = as.Date(observed_on),
+    month_num = month(observed_on),
+    month_label = month(observed_on, label = TRUE, abbr = TRUE)
+  ) %>%
+  filter(!is.na(month_num))
+
+# Aggregate by month
+monthly_counts <- hydnellum_data %>%
+  group_by(month_num, month_label) %>%
+  summarize(observations = n(), .groups = "drop")
+
+# Make sure months are in calendar order
+monthly_counts <- monthly_counts %>%
+  arrange(month_num)
+
+#make proportional
+monthly_counts <- monthly_counts %>%
+  mutate(freq = observations / sum(observations))
+
+# Plot
+ggplot(monthly_counts, aes(x = month_num, y = freq)) +
+  geom_area(fill = "tomato", alpha = 0.5) +
+  geom_line(color = "red4", size = 1.2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = expression("Seasonal Pattern of " * italic("Hydnellum peckii") * " (Relative Frequency)"),
+    x = "Month",
+    y = "Proportion of Observations"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 5. Ecology & Role
+
+-   **Ecological Function:** (saprotroph, mycorrhizal, parasite, etc.)\
+    Ectomycorrhizal, in fact one of the few species in its family, Bankeraceae whose ectomycorrhizal structure has been studied in detail. Its structure is characterized by a plectenchymatous mantle, a layer of tightly wrapped parallel hyphae. 
+
+-   **Substrate / Decomposition Role:**\
+    Often found in pine needles and moss litter.
+
+-   **Interactions:** (plants, animals, other fungi, pathogens)\
+    Associated with Doug fir, true firs, hemlock, lodgepole pine on the Oregon Coast, and jack pine in late stage boreal forests.
+
+-   **Environmental Sensitivity / Indicators:**
+
+    A decline has been observed in central Europe which may be due to nitrogen pollution. Since it is an indicator of late stage boreal forests, it only appears when the canopy has closed. For this reason it is impacted by deforesting.
+
+------------------------------------------------------------------------
+
+## 6. Conservation, Abundance & Threats
+
+-   **Abundance / Rarity in WA:**\
+    Only 4116 total observations exist on iNaturalist which is low relative to *Hydnellum peckiii's* wide range. Only 19 collections exist in the Burke Herbarium.
+
+-   **Conservation Status (state, federal, red list):**\
+    Listed as secure in Canada, including BC (1). Listed as not a concern in Washington on the Burke Herbarium image gallery (6).
+
+-   **Threats / Pressures:**\
+    Deforestation and nitrogen pollution
+
+-   **Management or Monitoring Notes:**
+
+    Not much evidence of active monitoring online. More of the management is happening in Europe through pine forest conservation and pollution management.
+
+------------------------------------------------------------------------
+
+## 7. Use / Ethnobiology / Toxicology
+
+-   **Edibility / Toxicity:**\
+    Not poisonous but apparently not pleasant to eat with a persisting pungent smell even when dried.
+
+-   **Traditional / Cultural Uses:**\
+    Can be used to make a beige dye.
+
+-   **Medicinal / Bioactive Compounds:**\
+    Contains atromentin which has anti bacterial and anti coagulant properties as well as thelephoric acid may be used for Alzheimer's.
+
+-   **Cautions / Warnings:\
+    **Not toxic
+
+------------------------------------------------------------------------
+
+## 8. References / Further Reading
+
+-   Key Literature Sources:
+
+    Banker, H. J. (1912). Type Studies in the Hydnaceae: I. The Genus Manina. *Mycologia*, *4*(5), 271--278. <https://doi.org/10.2307/3753450>
+
+-   Field Guides / Online Resources:\
+    1.) (N.d.). Retrieved from <https://explorer.natureserve.org/Taxon/ELEMENT_GLOBAL.2.1062113/Hydnellum_pecki>
+
+    2.) Hydnellum peckii. (2025). Retrieved from <https://en.wikipedia.org/wiki/Hydnellum_peckii>
+
+    3.) Red-Juice Tooth (Hydnellum peckii). (n.d.). Retrieved from <https://www.inaturalist.org/taxa/154949-Hydnellum-peckii>
+
+    4.) Stevens, M. W. & F. (n.d.). California fungi: Hydnellum peckii. Retrieved from <https://www.mykoweb.com/CAF/species/Hydnellum_peckii.html>
+
+    5.) Weird & wonderful creatures: Bleeding tooth fungus. (2016). Retrieved from <https://www.aaas.org/news/weird-wonderful-creatures-bleeding-tooth-fungus>
+
+-   Herbarium / Specimen Records (if applicable):
+
+    6.) WTU Herbarium, B. M. (n.d.). Retrieved from <https://burkeherbarium.org/imagecollection/taxon.php?Taxon=Hydnellum+peckiii> 
+
+------------------------------------------------------------------------
+
+## 9. Images / Illustrations
+
+-   **Fruiting Body Photos:**
+
+    ![Fruiting Body](Hydnelllum%20peckii.jpeg)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description: Fruiting body of *Hydnellum peckii*
+
+    Photo credit: Anthony Brooks, iNaturalist
+
+    </p>
+
+    [![Underside / Hymenium](underside.jpg)](https://burkeherbarium.org/imagecollection/photo.php?Photo=wtu103486&Taxon=Hydnellum%20peckii&SourcePage=taxon)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description: Hymenium
+
+    Photo credit: Michael Beug, Burke Image Gallery
+
+    </p>
+
+-   **Habitat Photo:**
+
+    ![Habitat](habitat.png)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description: Typical western hemlock forest habitat
+
+-   Photo credit: Washington DNR
+
+    </p>
+
+-   **Microscopy Photo (if available):**
+
+    Not Available
+
+------------------------------------------------------------------------
+
+## 10. Other Notes & Observations
+
+-   Field Notes / Observations:\
+    The red droplets on the fruiting body are the result of guttation, a phenomenon when liquid exudes from a plant or fungi.
+
+-   Questions / Uncertainties:\
+    Do these red droplets serve any reproductive function?
+
+-   Fun facts
+
+    The recognizable oozing red droplets where this species gets its name are actually only present in young fruiting bodies. Once it is done growing it takes on a more nondescript, brown appearance.
+
+------------------------------------------------------------------------

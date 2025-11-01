@@ -1,0 +1,153 @@
+---
+title: "Browse All Fungi"
+format:
+  html:
+    toc: true
+    page-layout: full
+---
+
+------------------------------------------------------------------------
+
+The data below comes from the University of Washington *Biology and Ecology of Fungi* class taught by Professor Claire Willing. Each row represents a fungal species recorded in Washington, with key information about taxonomy, ecology, and collection status.
+
+**Column highlights:**
+
+-   **Scientific_Name** – The formal Latin name of the species (italicized in the table).
+
+-   **Common_Name** – The widely recognized common name.
+
+-   **Phylum**, **Family**, **Hymenium_Type**, **Broad_Spore_Color**, **Spore_Color** – Morphological and taxonomic details.
+
+-   **Trophic_Mode**, **Guild**, **Host_Substrate**, **Host_Substrate_Association**, **Host_Substrate_Specificity** – Ecological roles and substrate associations.
+
+-   **Fungarium_Collection** – Indicates whether this species has specimens in the [Burke Museum Fungarium](https://www.burkemuseum.org/collections-and-research/biology/plants-and-fungi).
+
+-   **Entry.Year** – Year the data for this species was entered.
+
+Use the search boxes to filter by species, family, trophic mode, or fungarium collection status. Clicking on the scientific name will take you to a species fact sheet with additional details.
+
+**Disclaimer:** This table is for educational purposes. Collection regulations may change over time, and this information is not a substitute for official guidance. Always consult an expert before handling or consuming wild mushrooms.
+
+------------------------------------------------------------------------
+
+```{r}
+#| eval: false
+#| include: false
+library(rmarkdown)
+library(fs)
+library(stringr)
+
+# --- Directories ---
+rmd_dir <- "species"                # folder containing your .Rmd files
+
+# Create output folder if it doesn't exist
+dir_create(html_dir)
+
+# List all .Rmd files in the species folder
+rmd_files <- dir_ls(rmd_dir, glob = "*.Rmd")
+
+# Function to simplify HTML filenames: keep Genus_species only
+simplify_filename <- function(file_path) {
+  base <- path_ext_remove(path_file(file_path))
+  parts <- str_split(base, "_")[[1]]
+  if (length(parts) >= 2) {
+    paste0(parts[1], "_", parts[2], ".html")
+  } else {
+    paste0(base, ".html")
+  }
+}
+
+# Render each Rmd file
+#for (rmd_file in rmd_files) {
+  
+#  html_file <- path(simplify_filename(rmd_file))
+  
+#  render(
+#    input = rmd_file,
+#    quiet = TRUE
+#  )
+  
+#}
+```
+
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| echo: FALSE
+
+# --- Load packages ---
+library(googlesheets4)
+library(dplyr)
+library(stringr)
+library(DT)
+library(here)
+
+# --- 1. Define folder path for your rendered fact sheets ---
+html_folder <- "_site/species"
+
+# --- 2. Rename HTML files to clean, scientific-name-based filenames ---
+files <- list.files(html_folder, pattern = "\\.html$", full.names = TRUE)
+
+for (file in files) {
+  # Try to extract the clean species name part (e.g., Beauveria_bassiana)
+  new_name <- str_extract(basename(file), "[A-Z][a-z]+_[a-z]+")
+
+  # Skip if pattern not found
+  if (is.na(new_name)) next
+
+  # Construct new file path
+  new_path <- file.path(html_folder, paste0(new_name, ".html"))
+
+  # Rename only if the new name is different
+  if (basename(file) != basename(new_path)) {
+    file.rename(file, new_path)
+  }
+}
+
+
+# --- 3. Load species data from Google Sheet ---
+sheet_url <- "https://docs.google.com/spreadsheets/d/19Jl8Z8ZG5B-pnhH2Tk9COy3ERJX-AlVsFZ-zTPRCz3M/edit?usp=sharing"
+species <- read_sheet(sheet_url)
+
+
+# --- 4. Add clickable links to fact sheets ---
+# The table on your final site will expect links like 'species/Beauveria_bassiana.html'
+species <- species %>%
+  mutate(
+    Link = paste0("species/", gsub(" ", "_", Scientific_Name), ".html"),
+    Scientific_Name = sprintf('<a href="%s" target="_blank">%s</a>', Link, Scientific_Name)
+  ) %>%
+  select(-Species_ID)
+
+# --- 5. Render searchable datatable with clickable links ---
+datatable(
+  species %>%
+    mutate(
+      Scientific_Name = paste0(
+        "<em><a href='species/", Scientific_Name, ".html' target='_blank' style='color:#2c3e50; text-decoration:none;'>",
+        Scientific_Name,
+        "</a></em>"
+      )
+    ) %>%
+    select(-Link),
+  escape = FALSE,    # important to render HTML
+  filter = "top",
+  class = 'cell-border stripe hover',
+  rownames = FALSE,
+  options = list(
+    pageLength = 10,
+    autoWidth = FALSE,  # allow horizontal scrolling
+    scrollX = TRUE,
+    dom = 'Bfrtip',
+    buttons = c('copy', 'csv', 'excel'),
+    columnDefs = list(list(className = 'dt-center', targets = "_all"))
+  ),
+  width = '100%',
+  caption = htmltools::tags$caption(
+    style = 'caption-side: top; text-align: left; font-weight: bold; font-size: 16px; color: #2c3e50;',
+    'Species Information'
+  )
+)
+
+
+```

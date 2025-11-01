@@ -1,0 +1,583 @@
+---
+title: "Mushroom Collection in WA"
+format:
+  html:
+    toc: true
+      page-layout: full
+
+---
+
+This interactive map shows mushroom collection zones across Washington, including National Forests, State Parks, Tribal Lands, and National Parks. Hover over or click a region to see collection status, seasonal limits, and additional information provided by the managing agencies.
+
+Below the map, a detailed table expands on the information shown when hovering over regions. Use the search boxes to filter by forest, district, or permit type, and export the data for reference.
+
+#### ⚠️ Important Disclaimers
+
+-   **Collection regulations can change:** The information presented here is intended for educational purposes and may not reflect the most current rules. The authors of this site are not responsible for any inaccuracies or changes in mushroom collection regulations.
+
+-   **Safety first:** Do not eat wild mushrooms unless positively identified by a qualified expert. Many mushrooms are toxic or deadly.
+
+-   **Respect the land:** Always follow guidelines for sustainable collection and respect private, tribal, and protected lands.
+
+```{r setup, include=FALSE}
+library(googlesheets4)
+library(dplyr)
+library(sf)
+library(httr)
+library(ggplot2)
+library(stringr)
+library(osmdata)
+library(ggspatial)
+library(rnaturalearth)
+library(tigris)
+library(rnaturalearth)
+library(rnaturalearthhires) 
+library(leaflet)
+
+
+# Disable authentication for publicly available Google Sheets
+gs4_deauth()
+```
+
+```{r Helper functions}
+#| include: false
+clean_name <- function(x) {
+  x %>%
+    str_trim() %>%
+    tolower() %>%
+    str_replace_all("-", "/") %>%
+    str_replace_all("ranger district|national volcanic monument|national recreation area", "") %>%
+    str_replace_all("['\\.\\s]", "")
+}
+
+# Download and read shapefiles
+download_and_read_shapefile <- function(url, dest_dir) {
+  dir.create(dest_dir, recursive = TRUE, showWarnings = FALSE)
+  zip_path <- file.path(dest_dir, basename(url))
+  unzip_dir <- file.path(dest_dir, tools::file_path_sans_ext(basename(url)))
+  
+  if (!file.exists(zip_path)) download.file(url, zip_path, mode = "wb")
+  if (!dir.exists(unzip_dir)) unzip(zip_path, exdir = unzip_dir)
+  
+  shp_path <- list.files(unzip_dir, pattern = "\\.shp$", full.names = TRUE)[1]
+  st_read(shp_path)
+}
+
+# Get WA state boundary
+get_wa_state_boundary <- function(crs_target) {
+  states(cb = TRUE) %>%
+    filter(STUSPS == "WA") %>%
+    st_transform(crs_target)
+}
+
+# Prepare spatial layer with additional tags
+prepare_layer <- function(data, label, status, crs_target) {
+  st_make_valid(data) %>%
+    st_transform(crs_target) %>%
+    mutate(
+      Source = label,
+      Collection_Status = status
+    )
+}
+```
+
+```{r Load Permit Data from Google Sheets}
+#| include: false
+get_mushroom_data <- function(sheet_url) {
+  raw <- read_sheet(sheet_url)
+  
+  raw %>%
+    mutate(district = str_trim(District)) %>%
+    mutate(district = case_when(
+      district == "Mount St. Helens Naitonal Volcanic Monument and District" ~ "Mount St. Helens National Volcanic Monument",
+      district == "Priest Lake (IPNF)" ~ "Priest Lake",
+      TRUE ~ district
+    )) %>%
+    mutate(district = clean_name(district)) %>%
+    mutate(across(everything(), ~ na_if(., "N/A"))) %>%
+    mutate(across(everything(), ~ na_if(., "n/a"))) %>%
+    mutate(`Permit Required` = case_when(
+      str_starts(str_to_lower(`Permit Required`), "y") ~ "Yes",
+      str_starts(str_to_lower(`Permit Required`), "n") ~ "No",
+      TRUE ~ NA_character_
+    ))
+}
+
+sheet_url <- "https://docs.google.com/spreadsheets/d/1J2HmBiwuEY8uoxp059-h7cc9KxIs2Ta_2s0sHI2Wohw/edit?usp=sharing"
+mushroom_data <- get_mushroom_data(sheet_url)
+head(mushroom_data)
+```
+
+```{r Load boundaries}
+#| include: false
+get_nps_parks <- function(gdb_path) {
+  parks <- st_read(gdb_path, layer = "PADUS4_1Designation_State_WA")
+  
+  parks %>%
+    filter(d_Mang_Name == "National Park Service") %>%
+    mutate(Loc_Nm = case_when(
+      Loc_Nm == "Stephen Mather Wilderness" ~ "North Cascades National Park",
+      Loc_Nm == "Mount Rainier Wilderness" ~ "Mount Rainier National Park",
+      Loc_Nm == "Daniel J. Evans Wilderness" ~ "Olympic National Park",
+      TRUE ~ Loc_Nm)) %>%
+    select(starts_with("Shape"), Loc_Nm) %>%
+    rename(geometry = Shape, Forest = Loc_Nm) %>%
+    st_transform(crs = 4326)
+}
+
+gdb_path <- "data/nps/PADUS4_1_State_WA_GDB_KMZ/PADUS4_1_StateWA.gdb/"
+nps_parks <- get_nps_parks(gdb_path)
+nps_parks
+
+nps_clean <- nps_parks %>%
+  mutate(
+    DISTRICTNA = clean_name(Forest),
+    `Permit Required` = case_when(
+      Forest == "North Cascades National Park" ~ NA_character_,
+      TRUE ~ "No"  # General rule for other parks
+    ),
+    Source = "National Park Service"
+  )
+
+
+
+#### Load Districts and WA ####
+
+  zip_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.RangerDistrict.zip"
+  dest_dir <- "data/districts"
+  
+  districts_sf <- download_and_read_shapefile(zip_url, dest_dir)
+  districts_valid <- st_make_valid(districts_sf)
+  wa_state <- get_wa_state_boundary(st_crs(districts_valid))
+  wa_bbox <- st_as_sfc(st_bbox(c(xmin = -125, xmax = -116.5, ymin = 45.5, ymax = 49.1), crs = st_crs(districts_valid)))
+  
+  # districts_valid %>%
+  #   st_filter(wa_bbox) %>%
+  #   st_intersection(wa_state)
+  
+  
+districts_valid<-st_intersection(st_filter(districts_valid,wa_bbox),wa_state)
+
+wa_districts <- districts_valid
+wa_districts$DISTRICTNAFULL<-wa_districts$DISTRICTNA
+wa_districts$DISTRICTNA <- clean_name(wa_districts$DISTRICTNA)
+head(wa_districts)
+#Join Mushroom Data to Districts
+merge_mushroom_with_districts <- function(wa_districts, mushroom_data) {
+  wa_districts %>%
+    left_join(mushroom_data, by = c("DISTRICTNA" = "district")) %>%
+    mutate(
+      Limit = case_when(
+        FORESTNAME == "Wallowa-Whitman National Forest" &
+          str_to_lower(DISTRICTNA) == "hellscanyon" ~ "5 gallons (all species combined)",
+        TRUE ~ Limit
+      ),
+      `Permit Required` = case_when(
+        FORESTNAME == "Wallowa-Whitman National Forest" &
+          str_to_lower(DISTRICTNA) == "hellscanyon" ~ "No",
+        TRUE ~ `Permit Required`
+      )
+    ) %>%
+    group_by(FORESTNAME) %>%
+    mutate(`Permit Required` = if_else(
+      is.na(`Permit Required`),
+      first(na.omit(`Permit Required`)),
+      `Permit Required`
+    )) %>%
+    ungroup() %>%
+    select(-District, -Forest) %>%
+    mutate(
+      `Permit Required` = case_when(
+        Limit == "No Mushroom Collecting" ~ NA_character_,
+        TRUE ~ `Permit Required`
+      )
+    )
+}
+
+merged_data <- merge_mushroom_with_districts(wa_districts, mushroom_data)
+head(merged_data)
+
+
+merged_data <- merged_data %>%
+  mutate(Source = "USFS")
+
+st_crs(merged_data)
+st_crs(nps_clean)
+
+# Align CRS (use the CRS from merged_data)
+nps_clean <- st_transform(nps_clean, st_crs(merged_data))
+
+# Now safe to combine
+all_boundaries <- bind_rows(merged_data, nps_clean) %>%
+  st_make_valid()
+
+#### Load Tribal Layers ####
+# Tribal lands
+tribal_lands <- st_read("https://gis.dnr.wa.gov/site3/rest/services/Public_Boundaries/WADNR_PUBLIC_Major_Public_Lands_NonDNR/MapServer/2/query?where=1=1&outFields=*&f=geojson") %>%
+  st_make_valid() %>%
+  st_transform(st_crs(wa_state)) %>%
+  st_intersection(wa_state)
+
+# DNR forest lands
+dnr_lands <- st_read("https://gis.dnr.wa.gov/site3/rest/services/Public_Boundaries/WADNR_PUBLIC_Cadastre_OpenData/MapServer/6/query?outFields=*&where=1%3D1&f=geojson") %>%
+  st_transform(st_crs(wa_state))
+
+# WA state parks (you must download this beforehand)
+sf_use_s2(FALSE)
+
+state_parks <- st_read("data/stateparks/State_Park_Boundaries.geojson") %>%
+  st_make_valid() %>%
+  st_transform(st_crs(wa_state)) %>%
+  st_intersection(wa_state)
+#### Final Prep ####
+
+crs_target <- st_crs(wa_state)
+
+# Tribal lands (no collection allowed)
+tribal_lands_prepped <- prepare_layer(tribal_lands, "Tribal", "No", crs_target)
+
+# State Parks (no collection allowed)
+state_parks_prepped <- prepare_layer(state_parks, "State Park", "Yes", crs_target)
+
+```
+
+```{r Merge all}
+#| include: false
+merged_data_full <- bind_rows(
+  merged_data,
+  tribal_lands_prepped,
+  state_parks_prepped)
+
+merged_data_full <- merged_data_full %>%
+  mutate(
+    district = clean_name(DISTRICTNA),
+    Permit_Required_clean = str_to_lower(`Permit Required`),
+    Permit_Required_clean = na_if(Permit_Required_clean, "na"),
+    
+    Collection_Status = case_when(
+      Source == "Tribal" ~ "No",  # Collection not allowed for Tribal lands
+      Source == "State Park" ~ "Yes",  # Collection allowed in State Parks
+      Limit == "No Mushroom Collecting" ~ "No",  # If a limit says no mushroom collecting
+      Permit_Required_clean == "yes" ~ "Permit Required",  # If permit is required
+      Permit_Required_clean == "no" ~ "Yes",  # If no permit is required, collection is allowed
+      TRUE ~ NA_character_  # Default case for any unexpected conditions
+    ),
+    
+    # Ensure the correct factor levels
+    Collection_Status = factor(Collection_Status, levels = c("Yes", "Permit Required", "No"))
+  )
+
+
+merged_data_2 <- merged_data %>%
+  mutate(
+    district = clean_name(DISTRICTNA),
+    Permit_Required_clean = str_to_lower(`Permit Required`),
+    Permit_Required_clean = na_if(Permit_Required_clean, "na"),
+    
+    Collection_Status = case_when(
+      Source == "Tribal" ~ "No",  # Collection not allowed for Tribal lands
+      Source == "State Park" ~ "Yes",  # Collection allowed in State Parks
+      Limit == "No Mushroom Collecting" ~ "No",  # If a limit says no mushroom collecting
+      Permit_Required_clean == "yes" ~ "Permit Required",  # If permit is required
+      Permit_Required_clean == "no" ~ "Yes",  # If no permit is required, collection is allowed
+      TRUE ~ NA_character_  # Default case for any unexpected conditions
+    ),
+    
+    # Ensure the correct factor levels
+    Collection_Status = factor(Collection_Status, levels = c("Yes", "Permit Required", "No"))
+  )
+
+merged_data_full <- merged_data_full %>%
+  mutate(
+    district = clean_name(DISTRICTNA),
+    Permit_Required_clean = str_to_lower(`Permit Required`),
+    Permit_Required_clean = na_if(Permit_Required_clean, "na"),
+    
+    Collection_Status = case_when(
+      Source == "Tribal" ~ "No",  # Collection not allowed for Tribal lands
+      Source == "State Park" ~ "Yes",  # Collection allowed in State Parks
+      Limit == "No Mushroom Collecting" ~ "No",  # If a limit says no mushroom collecting
+      Permit_Required_clean == "yes" ~ "Permit Required",  # If permit is required
+      Permit_Required_clean == "no" ~ "Yes",  # If no permit is required, collection is allowed
+      TRUE ~ NA_character_  # Default case for any unexpected conditions
+    ),
+    
+    # Ensure the correct factor levels
+    Collection_Status = factor(Collection_Status, levels = c("Yes", "Permit Required", "No"))
+  )
+
+state_parks_prepped2 <- state_parks_prepped %>%
+  mutate(
+   
+    Collection_Status = case_when(
+      Source == "Tribal" ~ "No",  # Collection not allowed for Tribal lands
+      Source == "State Park" ~ "Yes",  # Collection allowed in State Parks
+     
+      TRUE ~ NA_character_  # Default case for any unexpected conditions
+    ),
+    
+    # Ensure the correct factor levels
+    Collection_Status = factor(Collection_Status, levels = c("Yes", "Permit Required", "No"))
+  )
+
+tribal_lands_prepped2 <- tribal_lands_prepped %>%
+  mutate(
+    
+    Collection_Status = case_when(
+      Source == "Tribal" ~ "No",  # Collection not allowed for Tribal lands
+      Source == "State Park" ~ "Yes",  # Collection allowed in State Parks
+      
+      TRUE ~ NA_character_  # Default case for any unexpected conditions
+    ),
+    
+    # Ensure the correct factor levels
+    Collection_Status = factor(Collection_Status, levels = c("Yes", "Permit Required", "No"))
+  )
+
+
+wa_outline <- get_wa_state_boundary(crs_target = st_crs(all_boundaries))
+
+# --- Ensure all spatial layers use WGS84 (EPSG:4326) ---
+to_wgs84 <- function(x) st_transform(x, crs = 4326)
+
+wa_outline <- to_wgs84(wa_outline)
+merged_data_2 <- to_wgs84(merged_data_2)
+tribal_lands_prepped2 <- to_wgs84(tribal_lands_prepped2)
+state_parks_prepped2 <- to_wgs84(state_parks_prepped2)
+nps_parks <- to_wgs84(nps_parks)
+
+nps_parks <- sf::st_transform(nps_parks, crs = 4326)
+
+
+```
+
+```{r Simple map}
+#| include: false
+map<-ggplot() +
+  geom_sf(data = wa_outline, fill = "lightgray", color = "lightgray", size = 0.5) +  
+  geom_sf(data = merged_data_full, aes(fill =Collection_Status), color = "white", size = 0.3) +
+ geom_sf(data = nps_parks, fill = NA, color = "purple", size = 0.7) +
+  scale_fill_manual(values = c("Yes" = "darkgreen", "No" = "red", "Permit Required" = "#E69F00"), na.value = "grey90") +
+  theme_minimal() +
+  labs(
+    title = "Mushroom Collection Permit Requirements on USFS Land in WA",
+    fill = "Collection",
+    caption = "Outlines: National Parks"
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.caption = element_text(size = 8)
+  ) +
+  theme_void()
+
+
+print(map)
+```
+
+```{r Leaflet Map}
+#| echo: false
+library(leaflet)
+library(sf)
+library(dplyr)
+
+# --- SAFETY CHECKS ---
+if (!"link" %in% names(merged_data_2)) merged_data_2$link <- NA_character_
+
+# --- COLOR PALETTE ---
+collection_palette <- colorFactor(
+  palette = c(
+    "Yes" = "#1B4F72",           # dark blue
+    "Permit Required" = "#B7950B",  # goldenrod
+    "No" = "#922B21"             # dark red
+  ),
+  domain = merged_data_full$Collection_Status,
+  na.color = "grey80"
+)
+
+# --- LEAFLET MAP ---
+leaflet(options = leafletOptions(minZoom = 5)) %>%
+  
+  # --- BASEMAPS ---
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addProviderTiles("Esri.WorldTopoMap", group = "Topo") %>%
+  addProviderTiles("OpenTopoMap", group = "Terrain") %>%
+  
+  # --- WASHINGTON OUTLINE ---
+  addPolygons(
+    data = wa_outline,
+    fillColor = NA,
+    color = "black",
+    weight = 1,
+    group = "WA Boundary"
+  ) %>%
+  
+  # --- NATIONAL FORESTS ---
+  addPolygons(
+    data = merged_data_2,
+    fillColor = ~collection_palette(Collection_Status),
+    color = "white",
+    weight = 0.7,
+    fillOpacity = 0.65,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#444",
+      fillOpacity = 0.85,
+      bringToFront = TRUE
+    ),
+    popup = ~paste0(
+      "<div style='width:260px; line-height:1.4; max-height:300px; overflow-y:auto;'>",
+      "<h4 style='margin:0; color:#2c3e50;'>🌲 ", FORESTNAME, "</h4>",
+      ifelse(!is.na(DISTRICTNAFULL), paste0("<b>District:</b> ", DISTRICTNAFULL, "<br/>"), ""),
+      ifelse(!is.na(Collection_Status), paste0("<b>Collection Status:</b> ", Collection_Status, "<br/>"), ""),
+      ifelse(!is.na(Limit), paste0("<b>Limits:</b> ", Limit, "<br/>"), ""),
+      ifelse(!is.na(`Permit Length`), paste0("<b>Season:</b> ", `Permit Length`, "<br/>"), ""),
+      ifelse(!is.na(Phone), paste0("<b>Ranger Phone:</b> ", Phone, "<br/>"), ""),
+      ifelse(!is.na(link) & link != "",
+             paste0("<a href='", link, "' target='_blank'>📄 National Forest Info</a>"), ""),
+      "</div>"
+    ),
+    label = ~paste("National Forest:", FORESTNAME),
+    group = "National Forests"
+  ) %>%
+  
+  # --- TRIBAL LANDS ---
+  addPolygons(
+    data = tribal_lands_prepped2,
+    fillColor = ~collection_palette(Collection_Status),
+    color = "white",
+    weight = 0.5,
+    fillOpacity = 0.8,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#444",
+      fillOpacity = 0.9,
+      bringToFront = TRUE
+    ),
+    popup = ~paste0(
+      "<div style='width:250px; line-height:1.4;'>",
+      "<b>Tribal Land:</b> ", NAME, "<br/>",
+      "<b>Collection Status:</b> ", Collection_Status, "<br/>",
+      "</div>"
+    ),
+    label = ~paste("Tribal Land:", NAME),
+    group = "Tribal Lands"
+  ) %>%
+  
+  # --- STATE PARKS ---
+  addPolygons(
+    data = state_parks_prepped2,
+    fillColor = ~collection_palette(Collection_Status),
+    color = "white",
+    weight = 0.5,
+    fillOpacity = 0.8,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#444",
+      fillOpacity = 0.9,
+      bringToFront = TRUE
+    ),
+    popup = ~paste0(
+      "<div style='width:250px; line-height:1.4; max-height:300px; overflow-y:auto;'>",
+      "<h4 style='margin:0;'>🏞️ ", ParkName, "</h4>",
+      "<b>Collection Status:</b> ", Collection_Status, "<br/>",
+      ifelse(!is.na(WebPage),
+             paste0("<a href='", WebPage, "' target='_blank'>State Park Info</a><br/>"), ""),
+      ifelse(!is.na(Imagelink),
+             paste0("<img src='", Imagelink, "' alt='", Description, 
+                    "' style='max-width:100%; height:auto; margin-top:5px;'>"), ""),
+      "</div>"
+    ),
+    label = ~paste("State Park:", ParkName),
+    group = "State Parks"
+  ) %>%
+  
+  # --- NATIONAL PARKS ---
+  addPolygons(
+    data = nps_parks,
+    fillColor = "purple",
+    fillOpacity = 0.15,
+    color = "purple",
+    weight = 1,
+    dashArray = "4 4",
+    label = ~Forest,
+    popup = ~paste0("<b>National Park:</b> ", Forest),
+    group = "National Parks"
+  ) %>%
+  
+  # --- LEGEND ---
+  addLegend(
+    position = "bottomright",
+    pal = collection_palette,
+    values = merged_data_full$Collection_Status,
+    title = "<strong>Collection Access</strong>",
+    labFormat = labelFormat(prefix = ""),
+    opacity = 0.9
+  ) %>%
+  
+  # --- CONTROLS ---
+  addLayersControl(
+    baseGroups = c("Positron", "Topo", "Terrain"),
+    overlayGroups = c("WA Boundary", "National Forests", "National Parks", "State Parks", "Tribal Lands"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  
+  # --- TITLE ---
+  addControl(
+    html = "<div style='font-size:18px; font-weight:bold; color:#2c3e50;'>
+              Washington Mushroom Collection Zones
+            </div>",
+    position = "topleft"
+  ) %>%
+  
+  # --- EXTRAS ---
+  addScaleBar(position = "bottomleft") %>%
+  addMiniMap(toggleDisplay = TRUE, minimized = TRUE)
+```
+
+```{r}
+#| include: false
+library(DT)
+library(dplyr)
+```
+
+<br><br> <!-- Adds vertical spacing -->
+
+Below is a detailed table that expands on the information shown when hovering over regions in the map above. You can **search, filter, and export** the table for reference.
+
+```{r}
+#| echo: false
+mushroom_data <- mushroom_data %>%
+select(
+-district
+)
+
+# Clean up columns if needed
+
+mushroom_data <- mushroom_data %>%
+mutate(across(everything(), ~ ifelse(is.na(.), "", .)))
+
+# Render interactive datatable
+
+datatable(
+mushroom_data,
+class = 'cell-border stripe hover',
+rownames = FALSE,
+filter = 'top',
+options = list(
+pageLength = 8,
+autoWidth = TRUE,
+scrollX = TRUE,
+dom = 'Bfrtip',
+buttons = c('copy', 'csv', 'excel'),
+columnDefs = list(list(className = 'dt-center', targets = "_all"))
+),
+width = '100%',
+caption = htmltools::tags$caption(
+style = 'caption-side: top; text-align: left; font-weight: bold; font-size: 16px; color: #2c3e50;',
+'Mushroom Collection Rules by District'
+)
+)
+
+
+```

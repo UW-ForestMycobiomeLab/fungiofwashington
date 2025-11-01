@@ -1,0 +1,25 @@
+---
+title: "Database of Washington Fungi"
+about:
+  template: jolla
+format:
+  html:
+    toc: false
+    page-layout: full
+---
+
+### Welcome to the *Fungi of Washington* Project!
+
+Explore the incredible diversity of fungi across Washington state, from common mushrooms in city parks to rare species in remote forests. This interactive website is designed to help students, researchers, and the public:
+
+-   **Browse Recorded Species:** Search and explore detailed information on hundreds of fungal species, including taxonomy, ecology, and collection records.
+
+-   **View Mushroom Collection Zones:** Use the interactive map to see where mushroom collection is allowed, restricted, or requires a permit across national forests, state parks, and tribal lands.
+
+-   **Access Species Fact Sheets:** Click on a species’ scientific name to view a dedicated page with images, ecological notes, and references.
+
+-   **Download Data:** Filter and export species information for educational or research purposes.
+
+**Important Note:** Collection regulations and ecological information may change over time. Always check current guidelines and consult an expert before handling or consuming wild mushrooms. This project is intended for educational purposes and does not replace official guidance.
+
+![](images/clipboard-1389551979.jpeg){width="705"}

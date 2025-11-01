@@ -1,0 +1,231 @@
+---
+date: "2025-10-13"
+output:
+  html_document:
+    toc: false
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+meta <- rmarkdown::metadata
+title_text <- "Entomophthora muscae" # manually set since we removed YAML title
+date_text <- meta$date
+```
+
+::: {style="text-align; margin-bottom: 1em;"}
+# *`r title_text`*
+
+**Date:** `r format(as.Date(date_text), "%B %d, %Y")`
+:::
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+packages <- c(
+  "rinat", "dplyr", "sf", "ggplot2",
+  "rnaturalearth", "rnaturalearthdata",
+  "lubridate", "devtools"
+)
+
+# Install any that aren't already installed
+installed <- packages %in% installed.packages()
+if (any(!installed)) {
+  install.packages(packages[!installed])
+}
+
+# Load all packages
+lapply(packages, library, character.only = TRUE)
+```
+
+------------------------------------------------------------------------
+
+## 1. Taxonomy & Nomenclature
+
+-   **Scientific Name (current):** *Entomophthora muscae*\
+-   **Synonyms / Former Names:** *E. schizophorae*, *Empusa muscae*\
+-   **Common Name(s):** Fly death fungus\
+-   **Taxonomic Authority / Citation:** (Cohn) Fresenius - Mycobank\
+-   **Higher Classification (Kingdom / Phylum / Class / Order / Family):** Fungi / Zoopagomycota / Entomophthoromycetes/ Entomophthorales / Entomophthoraceae
+
+------------------------------------------------------------------------
+
+## 2. Morphology & Identification
+
+-   **Fruiting Body Description:** (size, shape, color, texture) White-clear spores covering the abdomen of infected host. Individually the spores on the conidiophores are very small, but clumped together on the insect they are visible. The conidiophores burst out of the insect, and the conidia (spores) form at the end, forming a thick layer on the host.
+-   **Cap / Pileus Characteristics:** There is no cap.
+-   **Gills / Pores / Spines / Teeth / Etc.:** There are none of these.
+-   **Stipe / Stem / Attachment / Ring / Volva / Base:** Not applicable.
+-   **Spore Print Color:** In a non-traditional sense, it is white. If an insect infected with Entomophthora muscae dies on glass, it will leave a white ring of spores around it.
+-   **Microscopic Features (if available):** (spore size & shape, cystidia, etc.) The spores are white and circular with thick walls for winter survival.
+-   **Other Diagnostic Characters:** (odor, bruising reactions, latex, color change, etc.) The dead insect will climb to a high point and strike a "death-pose," where it will lock onto a high point and spread its wings, before dying, making it so the spores can be released easily and effectively.
+-   **Similar Species / Potential Confusions:** *Entomophthora syrphi*, which is pretty similar but with far less data, seems to infect the underside of specific insects.
+
+------------------------------------------------------------------------
+
+## 3. Distribution & Habitat in Washington
+
+-   **Range (counties or regions):** *Entomophthora muscae* is spread realativly worldwide, whith its largest areas being the east coast of the United States, and Europe.
+-   **Geographic Distribution in WA:** *Entomophthora muscae* is found mostly found in the Sound area, with some spottings further north.
+-   **Elevation Range:** It is found in temperate regions.
+-   **Habitat Types / Substrate Preferences:** (forest type, soil, leaf litter, dead wood, etc.) It is found where their host flies are found which is usually damp and cool substrates.
+-   **Host Associations (if applicable):** Hosts are several families of flies (Diptera).
+
+```{r Distribution-map-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# 1. Get records by taxon_id (Hygrocybe singerii = 339550)
+hygrocybe_data <- get_inat_obs(taxon_id = 339550, maxresults = 10000)
+
+# 2. Convert to sf object
+hygrocybe_sf <- hygrocybe_data %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# 3. Get WA state polygon
+wa_state <- ne_states(country = "United States of America", returnclass = "sf") %>%
+  filter(name == "Washington") %>%
+  st_transform(st_crs(hygrocybe_sf))
+
+# 4. Keep points inside WA
+hygrocybe_wa <- hygrocybe_sf[st_within(hygrocybe_sf, wa_state, sparse = FALSE), ]
+
+# 5. Plot
+ggplot() +
+  geom_sf(data = wa_state, fill = "gray95", color = "black") +
+  geom_sf(data = hygrocybe_wa, color = "purple", alpha = 0.6, size = 2) +
+  labs(
+    title = "iNaturalist Observations of Entomophthora muscae in Washington State",
+    caption = "Data source: iNaturalist"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 4. Seasonality & Phenology
+
+-   **Months of Fruiting in WA:** Usually fruits in Autumn and Spring and sporulation coincides with cool humid conditions in areas with lots of hosts (Diptera).
+-   **Seasonal Notes:** (peak times, moisture dependence, etc.) As mentioned above, *Entomophthora muscae* can only persist in cool areas, so its peaks will be Autumn and Spring, with a preference for termperate regions and moist areas (these are also what the host Diptera prefers.)
+
+```{r Seasonality-plot-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Make sure your date column is parsed
+hygrocybe_data <- hygrocybe_wa %>%
+  mutate(
+    observed_on = as.Date(observed_on),
+    month_num = month(observed_on),
+    month_label = month(observed_on, label = TRUE, abbr = TRUE)
+  ) %>%
+  filter(!is.na(month_num))
+
+# Aggregate by month
+monthly_counts <- hygrocybe_data %>%
+  group_by(month_num, month_label) %>%
+  summarize(observations = n(), .groups = "drop")
+
+# Make sure months are in calendar order
+monthly_counts <- monthly_counts %>%
+  arrange(month_num)
+
+#make proportional
+monthly_counts <- monthly_counts %>%
+  mutate(freq = observations / sum(observations))
+
+# Plot
+ggplot(monthly_counts, aes(x = month_num, y = freq)) +
+  geom_area(fill = "orchid4", alpha = 0.5) +
+  geom_line(color = "purple4", size = 1.2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = expression("Seasonal Pattern of " * italic("Entomophthora muscae") * " (Relative Frequency)"),
+    x = "Month",
+    y = "Proportion of Observations"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 5. Ecology & Role
+
+-   **Ecological Function:** (saprotroph, mycorrhizal, parasite, etc.) *Entomophthora muscae* parasite that infects Diptera.
+-   **Substrate / Decomposition Role:** It kills its host, which in a way leads to decompostion of the insect.
+-   **Interactions:** (plants, animals, other fungi, pathogens) Infects and kills Diptera flies.
+-   **Environmental Sensitivity / Indicators:** The fungus is temperature sensitive, and cannot survive high temperatures, so it's present primarily in temperate months. An indicator that the fungus might be present is large groups of the host flies, dead and alive.
+
+------------------------------------------------------------------------
+
+## 6. Conservation, Abundance & Threats
+
+-   **Abundance / Rarity in WA:** *Entomophthora muscae* are not entirely uncommon in WA, but its range has not been assessed in detail. There are many sightings of this fungus around the Sound, which makes sense due to the environmental needs of the fungus being moist and cool. There are a few other sightings south and east of the Sound, but none in eastern WA, as it is too hot and dry there.
+-   **Conservation Status (state, federal, red list):** The conservation status of *E. muscae* in North America has not been assessed, and it is listed as unranked due to lack of data.
+-   **Threats / Pressures:** The main pressures of *Entomophthora muscae* are environmental, as it has no known predators. Therefore, the weather and tempature is what will effect it most, as it needs cool and moist environments to thrive.
+-   **Management or Monitoring Notes:** The only way to monitor the fungus is by monitoring the flies, and there is no current management for killing the fungus, but flies have been known to seak heat to slow the fungus growth.
+
+------------------------------------------------------------------------
+
+## 7. Use / Ethnobiology / Toxicology
+
+-   **Edibility / Toxicity:** Not edible, but also not fatal or a concern for humans.
+-   **Traditional / Cultural Uses:** Potential for use in biological control for constraining pest populations, but difficult to culture because it must be maintained through direct transfer between hosts.
+-   **Medicinal / Bioactive Compounds:** There are no effects for humans, but in its host, the fungus releases toxins called sesquiterpenes, that entice males to mate with an infected female.
+-   **Cautions / Warnings:** Once again, *Entomophthora muscae* poses no threat to humans. There could be deleterious ecosystem effects if an outbreak were to reach levels that would cause serious decline in fly populations.
+
+------------------------------------------------------------------------
+
+## 8. References / Further Reading
+
+-   Key Literature Sources: Dara, Surendra K. and Humber, Richard A. “Chapter 39 - Entomophthoran.” Beneficial Microbes in Agro-Ecology, edited by N. Amaresan, M. Senthil Kumar, K. Annapurna, Krishna Kumar, and A. Sankaranarayanan, Academic Press, 2020, pp. 757-775. doi.org/10.1016/B978-0-12-823414-3.00039-3.\
+    Naundrup, Andreas et al. “Pathogenic fungus uses volatiles to entice male flies into fatal matings with infected female cadavers.” The ISME Journal, vol. 16, no. 10, 2022, pp. 2388-2397. <doi:10.1038/s41396-022-01284-x>.  
+
+-   Field Guides / Online Resources: “Entomophthora muscae.” iNaturalist, www.inaturalist.org/taxa/1098570-Entomophthora-muscae#articles-tab. “Entomophthora muscae.” NatureServe Explorer, 3 Oct. 2025, explorer.natureserve.org/Taxon/ELEMENT_GLOBAL.2.1086383/Entomophthora_muscae. Watson, D.W. “Entomophthora muscae.” Biological Control: A Guide to Natural Enemies in North America. Cornell University College of Agriculture and Life Sciences. biocontrol.entomology.cornell.edu/pathogens/entomophagamuscae.php. Volk, Thomas J. “Tom Volk's Fungus of the Month for March 2000.” Tom Volk Fungi, botit.botany.wisc.edu/toms_fungi/mar2000.html.  
+
+-   Herbarium / Specimen Records (if applicable):N/A
+
+------------------------------------------------------------------------
+
+## 9. Images / Illustrations
+
+-   **Fruiting Body Photos:**
+
+    ![Side view](fruiting.body.png)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description; Fly infected with E. muscae. Credit: Hans Hillewaert
+
+    </p>
+
+    ![Underside / Hymenium](under.spores.png)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description; Conidial shower on a glass surface after death of host. Credit: NatureSpot
+
+    </p>
+
+-   **Habitat Photo:**
+
+    ![Habitat](really.sporey.png)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description; Close up of the fungal body extruding from the fly abdomen. Credit: František ŠARŽÍK
+
+    </p>
+
+-   **Microscopy Photo (if available):**
+
+    ![Microscopy](micro.spore.jpg)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description; E. muscae conidiophores and conidia. Credit: Thomas J. Volk
+
+    </p>
+
+------------------------------------------------------------------------
+
+## 10. Other Notes & Observations
+
+-   **Fun facts:** Infected flies have been known to go near heat sources to raise their temperature and stop fungal growth Entomo- means insect, -phthora means destroyer, musca = house fly genus, latin for fly
+
+------------------------------------------------------------------------

@@ -1,0 +1,263 @@
+---
+date: "2025-10-13"
+output:
+  html_document:
+    toc: false
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+meta <- rmarkdown::metadata
+title_text <- "Thelephora terrestris" # manually set since we removed YAML title
+date_text <- meta$date
+```
+
+::: {style="text-align; margin-bottom: 1em;"}
+# *`r title_text`*
+
+**Date:** `r format(as.Date(date_text), "%B %d, %Y")`
+:::
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+packages <- c(
+  "rinat", "dplyr", "sf", "ggplot2",
+  "rnaturalearth", "rnaturalearthdata",
+  "lubridate", "devtools"
+)
+
+# Install any that aren't already installed
+installed <- packages %in% installed.packages()
+if (any(!installed)) {
+  install.packages(packages[!installed])
+}
+
+# Load all packages
+lapply(packages, library, character.only = TRUE)
+```
+
+------------------------------------------------------------------------
+
+## 1. Taxonomy & Nomenclature
+
+-   **Scientific Name (current):** *Thelephora terrestris*
+-   **Synonyms / Former Names:** NA
+-   **Common Name(s):** Earthfan fungus \| Common Fiber Vase \| Groundwart
+-   **Taxonomic Authority / Citation:** Stevens, F, and Wood, M. (2007-2021) "California Fungi-Thelephora terrestris." The Fungi of California. Retrieved from: <https://www.mykoweb.com/CAF/species/Thelephora_terrestris.html>. Kuo, M. (2015, December). Thelephora terrestris. Retrieved from the MushroomExpert.Com Web site: <http://www.mushroomexpert.com/thelephora_terrestris.html> "Common Fiber Vase (Thelephora terrestris)." iNaturalist.org. Retrieved from: <https://www.inaturalist.org/taxa/118102-Thelephora-terrestris>. Jones, Julie. "Thelephora terrestris: earthfan, common fiber vase, groundwart." Burke Herbarium Image Collection. Retrieved from: <https://burkeherbarium.org/imagecollection/taxon.php?Taxon=Thelephora%20terrestris>.
+-   **Higher Classification (Kingdom / Phylum / Class / Order / Family):** Fungi \> Basidiomycota \> Agaricomycetes \> Thelephorales \> Thelephoraceae
+
+------------------------------------------------------------------------
+
+## 2. Morphology & Identification
+
+-   **Fruiting Body Description:**\
+    Mostly brown with white cap outline. Young fruiting bodies start off light brown and turn a darker shade as they mature, with the mushroom forming frilly rosettes. Its common name is derived from its fan-like shape. Mushrooms as large as 6 cm wide have been observed (iNaturalist.org).
+
+-   **Cap / Pileus Characteristics:**\
+    The cap is fan-shaped, or semi-circular and slightly depressed (iNaturalist.org; burkeherbarium.org; minnesotaseasons.com). The texture has been described as silky, fibrillose, brown fan-shaped caps, with a leathery texture and a white border (mushroomexpert.com). Sometimes the rim of the cap can be “frilly” (ibid).
+
+-   **Gills / Pores / Spines / Teeth / Etc.:**\
+    Gray to brown, smooth, with small pores (iNaturalist.org; burkeherbarium.org; minnesotaseasons.com; mushroomexpert.com). In old age the underside can become slightly wrinkled, sometimes described as “bumpy” (ibid).
+
+-   **Stipe / Stem / Attachment / Ring / Volva / Base:**\
+    The stipe is usually very short or not present at all–tends to depend on substrate type. The texture of the stipe is tough and its coloration is similar to the cap, maybe slightly lighter (ibid).
+
+-   **Spore Print Color:**\
+    Spore print is brown (mushroomexpert.com).
+
+-   **Microscopic Features (if available):**\
+    The basidiospores have a “bumpy” or spiny-looking surface. They are about 7-10 μm across and 5-6 μm tall. Similar to a number of other species within basidiomycota, clamp connections visible on *T. terrestris* hyphae (ibid).
+
+-   **Other Diagnostic Characters:**\
+    Most sites noted that it does not have a distinctive flavor, but has a moldy earth-like smell (iNaturalist.org; burkeherbarium.org; minnesotaseasons.com; mushroomexpert.com).
+
+-   **Similar Species / Potential Confusions:**\
+    According to Kuo (mushroomexpert.com), the version of this fungus that grows in North America is probably not the same one that was originally described in Europe in the 18th century! *Thelephora palmata* is a “stinkier” look-alike of *T. terrestris*. *T. palmata* is also more branched and coral-like, and less abundant (iNaturalist.org; burkeherbarium.org; minnesotaseasons.com; mushroomexpert.com). *T. vialis* is another similar species, but iNat describes it as "more robust." *Cotylidia diaphana* and *Podoscypha petalodes* can look similar as well. Finally, the upper surface of *Hydnellum* caps resemble those of *T. terrestris*, but have "teeth" underneath (iNaturalist.org).
+
+## 3. Distribution & Habitat in Washington
+
+-   **Range & Geographic Distribution in WA:**\
+    Worldwide, *T. terrestris* exists in almost every continent, but is notably absent between the latitudes 30ºN and 30ºS (minnesotaseasons.com). In Washington, *T. terrestris* is more commonly found west of the Cascade Range, around King, Snohomish, Skagit, Whatcom, Pierce, Thurston, Mason, Kitsap County, including some recorded sightings in Clallam, Skamania, Stevens, and Spokane County (iNaturalist.org; burkeherbarium.org). The range seems to stretch up the coast, into British Columbia, and southward into Oregon and California. In these regions, *T. terrestris* finds tend to follow the pattern in Washington: they are localized to the coast, with sparser observations east of the Cascades (iNaturalist.org).
+
+-   **Elevation Range:**\
+    We could not find any information on elevation range.
+
+-   **Habitat Types / Substrate Preferences:**\
+    *T. terrestris* is most commonly found in sandy soils, usually close to or underneath host species (iNaturalist.org). However, this species is quite widely distributed and sturdy, so it can establish on a variety of soil types. For instance, it’s commonly seen on roadside ditches, acidic soils, post-wildfire soils and soils with tephra deposits. It also dominates in ecosystems that have been treated with fungicides and fertilizers (Colpaert 1999).
+
+-   **Host Associations (if applicable):**\
+    *Thelephora terrestris* has a broad host range. It is best known to associate with conifers in the genera *Pinus* (pines) and *Picea* (spruces), and with *Pseudotsuga menziesii*. *T. terrestris* also colonizes hosts in the genera *Quercus* (oaks), *Alnus* (alder), *Populus* (cottonwoods, poplar, aspen), *Salix* (willows), *Castanea* (chestnut), and *Fagus* (beech) (Colpaert 1999; minnesotaseasons.com).
+
+```{r Distribution-map-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# 1. Get records by taxon_id (Thelephora terrestris = 118102)
+tterrestris_data <- get_inat_obs(taxon_id = 118102, maxresults = 10000)
+
+# 2. Convert to sf object
+tterrestris_sf <- tterrestris_data %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# 3. Get WA state polygon
+wa_state <- ne_states(country = "United States of America", returnclass = "sf") %>%
+  filter(name == "Washington") %>%
+  st_transform(st_crs(tterrestris_sf))
+
+# 4. Keep points inside WA
+tterrestris_wa <- tterrestris_sf[st_within(tterrestris_sf, wa_state, sparse = FALSE), ]
+
+# 5. Plot
+ggplot() +
+  geom_sf(data = wa_state, fill = "gray95", color = "black") +
+  geom_sf(data = tterrestris_wa, color = "purple", alpha = 0.6, size = 2) +
+  labs(
+    title = expression("iNaturalist Observations of " * italic("Thelephora terrestris") * " in Washington State"),
+    caption = "Data source: iNaturalist"
+  ) +
+  theme_classic()
+```
+
+Fig.1. observations of *T. terrestris* in Washington State, recorded in iNaturalist.
+
+------------------------------------------------------------------------
+
+## 4. Seasonality & Phenology
+
+-   **Months of Fruiting in WA:**\
+    *Thelephora terrestris* is seen year-round, but the main fruiting season is June through early/mid November (iNaturalist.org, research-grade observations).
+-   **Seasonal Notes:**\
+    Peak fruiting months seem to be August through October. 2025 Observations starkly increased from \~200 in July to \~600 in August, maintaining a steady high until October, then dropping back to \~200 in November (iNaturalist.org).
+
+```{r Seasonality-plot-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Make sure your date column is parsed
+tterrestris_data <- tterrestris_wa %>%
+  mutate(
+    observed_on = as.Date(observed_on),
+    month_num = month(observed_on),
+    month_label = month(observed_on, label = TRUE, abbr = TRUE)
+  ) %>%
+  filter(!is.na(month_num))
+
+# Aggregate by month
+monthly_counts <- tterrestris_data %>%
+  group_by(month_num, month_label) %>%
+  summarize(observations = n(), .groups = "drop")
+
+# Make sure months are in calendar order
+monthly_counts <- monthly_counts %>%
+  arrange(month_num)
+
+#make proportional
+monthly_counts <- monthly_counts %>%
+  mutate(freq = observations / sum(observations))
+
+# Plot
+ggplot(monthly_counts, aes(x = month_num, y = freq)) +
+  geom_area(fill = "orchid4", alpha = 0.5) +
+  geom_line(color = "purple4", size = 1.2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = expression("Seasonal Pattern of " * italic("Thelephora terrestris") * " (Relative Frequency)"),
+    x = "Month",
+    y = "Proportion of Observations"
+  ) +
+  theme_classic()
+```
+
+Fig. 2. relative frequency of *T. terrestris* seasonal fruiting in Washington State, expressed as proportion of iNaturalist observations by month.
+
+------------------------------------------------------------------------
+
+## 5. Ecology & Role
+
+-   **Ecological Function:**\
+    *Thelephora terrestris* are ectomycorrhizal fungi (EcMF) with moderate to low saprotrophic capacity (Kanunfre & Zancan 1998; Colpaert 1999; iNaturalist.org; mushroomexpert.com). Given their ability to persevere in a variety of harsh conditions, *T. terrestris* are primary symbiont colonizers–also known as pioneer mycobionts–and aggressively competitive (Marx et al. 1970, Colpaert 1999). Interestingly, in the early 1900s they were characterized as parasites due to instances of fruiting bodies enveloping and suffocating entire seedlings (Colpaert 1999). Nursery managers inoculate seedlings with *T. terrestris* with caution because they easily outcompete other EcM species (ibid).
+
+-   **Substrate / Decomposition Role:**\
+    *Thelephora terrestris* can tolerate a wide range of soil types, but seems most dominant on disturbed soils, often low in humus and high in acidity, and can tolerate dry or wet conditions. It is commonly found in disturbed sites, as discussed above (Marx et al. 1970, Colpaert 1999). *T. terrestris* is known to produce exolaccase, which breaks down lignin (Kanunfre & Zancan 1998).
+
+-   **Interactions:**\
+    *Thelephora terrestris* produce and exude mycotoxins that confer pine hosts protection from Phytophthora cinnamomi, a soil-borne oomycete (iNaturalist.org). *Phytophthora* are destructive plant pathogens that cause root rot and eventual dieback of the plant. *T. terrestris* has also been observed to support seedling tolerance to stressful environmental conditions in disturbed habitats such as sites high in tephra (Colpaert 1999). Peterzk et al. (2016) described a dsRNA virus (T. terrestris virus 1) that infects *T. terrestris*. Not much is known about the effect of this virus on *T. terrestris*. *T. terrestris*’ aggressive mycorrhizal ability is a double-edged-sword, presenting a challenge for other ectomycorrhizal species that colonize *T. terrestris*’ hosts. *T. terrestris* has been observed to easily outcompete other EcM species (Colpaert 1999).
+
+-   **Environmental Sensitivity / Indicators:**\
+    *T terrestris* is generally a very tolerant species. They can tolerate soils with high or low nitrogen, periods of flooding in soils, and have shown to be fairly tolerant of high concentrations of zinc and copper. *T. terrestris* is, however, very sensitive to cadmium. Lack of *T. terrestris* in disturbed sites may indicate high levels of cadmium. *T. terrestris* is also fairly sensitive to competition, and tends to be less dominant in soils with indigenous mycorrhizal species present (Colpaert 1999).
+
+------------------------------------------------------------------------
+
+## 6. Conservation, Abundance & Threats
+
+-   **Abundance / Rarity in WA:**\
+    Widespread and abundant (burkeherbarium.org; minnesotaseasons.com; iNaturalist.org).
+
+-   **Conservation Status (state, federal, red list):**\
+    It does not appear to be a species of concern at a state or federal level (ibid).
+
+-   **Threats / Pressures:**\
+    No information could be found, probably because it is quite a resistant species.
+
+-   **Management or Monitoring Notes:**\
+    It is a species of interest in nurseries due to its ability to confer a greater level of protection to seedling and adult hosts, for the myriad of reasons discussed above (Colpaert 1999). It has also been widely used in forest restoration projects. However, its competitive potential is of note, as it can be problematic when trying to innoculate species with a variety of EcMF (ibid).
+
+------------------------------------------------------------------------
+
+## 7. Use / Ethnobiology / Toxicology
+
+-   **Edibility / Toxicity:**\
+    Does not seem to be edible (burkeherbarium.org; minnesotaseasons.com; iNaturalist.org). Undesirable ecause of its tough texture (first-nature.com).
+
+-   **Traditional / Cultural Uses:**\
+    Unknown or not recorded.
+
+-   **Medicinal / Bioactive Compounds:**\
+    Unknown.
+
+-   **Cautions / Warnings:** None.
+
+------------------------------------------------------------------------
+
+## 8. References / Further Reading
+
+Colpaert, J. V. (1999). Thelephora. In J. W. G. Cairney & S. M. Chambers (Eds.), Ectomycorrhizal Fungi Key Genera in Profile (pp. 325–345). Springer. <https://doi.org/10.1007/978-3-662-06827-4_14>
+
+Common Fiber Vase (Thelephora terrestris). (iNaturalist.org). Retrieved October 25, 2025, from <https://www.inaturalist.org/taxa/118102-Thelephora-terrestris>
+
+Kanunfre, C. C., & Zancan, G. T. (1998). Physiology of exolaccase production by Thelephora terrestris. FEMS Microbiology Letters, 161(1), 151–156. [https://doi.org/10.1016/S0378-1097(98)00067-6](https://doi.org/10.1016/S0378-1097(98)00067-6){.uri}
+
+Kuo, M. (2015, December). Thelephora terrestris. Retrieved from the MushroomExpert.Com Web site: <http://www.mushroomexpert.com/thelephora_terrestris.html>
+
+Marx, D. H., Bryan, W. C., & Grand, L. F. (1970). Colonization, isolation, and cultural descriptions of Thelephora terrestris and other ectomycorrhizal fungi of shortleaf pine seedlings grown in fumigated soil. Canadian Journal of Botany, 48(2), 207–211. <https://doi.org/10.1139/b70-031>
+
+Petrzik, K., Sarkisova, T., Starý, J., Koloniuk, I., Hrabáková, L., & Kubešová, O. (2016). Molecular characterization of a new monopartite dsRNA mycovirus from mycorrhizal Thelephora terrestris (Ehrh.) and its detection in soil oribatid mites (Acari: Oribatida). Virology, 489, 12–19. <https://doi.org/10.1016/j.virol.2015.11.009>
+
+Stevens, M. W. & F. (n.d.). California Fungi: Thelephora terrestris. Retrieved October 25, 2025, from <http://www.mykoweb.com/CAF/species/Thelephora_terrestris.html>
+
+Thelephora terrestris—Burke Herbarium Image Collection. (n.d.). Retrieved October 27, 2025, from <https://burkeherbarium.org/imagecollection/taxon.php?Taxon=Thelephora%20terrestris>
+
+Thelephora terrestris, Earthfan fungus. (n.d.). Retrieved October 27, 2025, from <https://www.first-nature.com/fungi/thelephora-terrestris.php>
+
+Thelephora terrestris (MushroomExpert.Com). (n.d.). Retrieved October 25, 2025, from <http://www.mushroomexpert.com/thelephora_terrestris.html>
+
+------------------------------------------------------------------------
+
+## 9. Images / Illustrations
+
+-   **Fruiting Body Photos:**
+
+![Fig. 3.1. young T. terrestris fruiting body; cap view. Photo credit: David Kelly.](images/thelephora-terrestris-young.jpg){fig-align="center" fig-cap="T. terrestris cap"}
+
+![Fig. 3.2. mature T. terrestris fruiting body; cap view and hymenium view. Photo credit: Michael Wood.](images/Thelephora_terrestris_image.jpg){fig-align="center" fig-cap="T. terrestris hymenial"}
+
+-   **Habitat Photo:**
+
+![Fig. 4. T. terrestris growing on bare soil. Photo: Matt Knepley.](images/tterrestris_habitat.jpg){fig-align="center" fig-cap="T. terrestris habitat"}
+
+-   **Microscopy Photo (if available):**
+
+![Fig. 5.1. T. terrestris basidiospores. Photo credit: Michael Kuo.](images/thelephora_terrestris_spores.jpg){fig-align="center" fig-cap="T. terrestris spores"}
+
+![Fig. 5.2. T. terrestris tramal hyphae Photo credit: Michael Kuo.](images/thelephora_terrestris_hyphae.jpg){fig-align="center" fig-cap="T. terrestris hyphae"}
+
+```         
+------------------------------------------------------------------------
+```

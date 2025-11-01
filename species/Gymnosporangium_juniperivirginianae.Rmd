@@ -1,0 +1,263 @@
+---
+date: "2025-10-13"
+output:
+  html_document:
+    toc: false
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+meta <- rmarkdown::metadata
+title_text <- "Gymnosporangium juniperi-virginianae" # manually set since we removed YAML title
+date_text <- meta$date
+```
+
+::: {style="text-align; margin-bottom: 1em;"}
+# *`r title_text`*
+
+**Date:** `r format(as.Date(date_text), "%B %d, %Y")`
+:::
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+packages <- c(
+  "rinat", "dplyr", "sf", "ggplot2",
+  "rnaturalearth", "rnaturalearthdata",
+  "lubridate", "devtools"
+)
+
+# Install any that aren't already installed
+installed <- packages %in% installed.packages()
+if (any(!installed)) {
+  install.packages(packages[!installed])
+}
+
+# Load all packages
+lapply(packages, library, character.only = TRUE)
+```
+
+------------------------------------------------------------------------
+
+## 1. Taxonomy & Nomenclature
+
+-   **Scientific Name (current):** *Gymnosporangium juniperi-virginianae*
+-   **Synonyms / Former Names:** Obligate Synonyms: *Podisoma juniperi-virginianae; Tremella juniperi-virginianae*; Taxonomic Synonyms: *Gymnosporangium virginianum;* *Aecidium* *juniperi-virginianae; Gymnosporangium/Podisoma macropus; Roestelia/Aecidium/Caeoma pyrata/pyratum/piratum*
+-   **Common Names:** Cedar-apple Rust; Juniper-apple Rust; Cedar Rust
+-   **Taxonomic Authority / Citation:** *Gymnosporangium juniperi-virginianae* Schweinitz, Schriften Naturf. Ges. Leipzig (1822)
+-   **Higher Classification (Kingdom / Phylum / Class / Order / Family):** Kingdom Fungi / Phylum Basidiomycota / Subphylum Pucciniomycotina / Class Pucciniomycetes / Order Rust Fungi / Suborder Uredinineae / Family Gymnosporangiaceae / Genus Cedar Rusts (Gymnosporangium)
+
+------------------------------------------------------------------------
+
+## 2. Morphology & Identification
+
+-   **Fruiting Body Description:**\
+    [Telial Stage]{.underline}: 6-50mm reddish-brown round galls hydrate to produce 10-20mm long bright orange gelatinous telia horns that produce teliospores, that when germinated, produce basidia that release basidiospores to be carried to apple leaves by the wind.
+
+    [Aecial Stage]{.underline}: yellow-orange to orange-red pycnia flask-like lesions on upper apple leaf surfaces that produce pycniospores and a sticky substance to attract insects which transport pycniospores between lesions. Tube-like orange-yellow aecia form on the on undersurface of leaves, and produce aeciospores to be carried to cedar trees by the wind.
+
+-   **Cap / Pileus Characteristics:** N/A
+
+-   **Gills / Pores / Spines / Teeth / Etc.:** Basidia formed at skin of telia horns
+
+-   **Stipe / Stem / Attachment / Ring / Volva / Base:** Galls begin as small bumps on the woody portion of the plant such as needle bases or through cracks of branches.
+
+-   **Spore Print Color:** White/cream spores, unobtainable print
+
+-   **Microscopic Features:** two-celled teliospores; basidiospores, pycniospores, aeciospores
+
+-   **Other Diagnostic Characters:** Telial Stage: cycles between orange gelatinous cones (wet) and dark brown threads (dry) 8-10 times during the spring
+
+-   **Similar Species / Potential Confusions:** *Gymnotelium blasdaleanum* and *Puccinia coronata;* other *Gymnosporangiums*: *G. clavariiforme, G. clavipes, G. corniculans, G. cornutum*
+
+------------------------------------------------------------------------
+
+## 3. Distribution & Habitat in Washington
+
+-   **Range (counties or regions):** North America, including Central Eastern US & Canada, anywhere with overlap of Junipers and Crab/Apple trees
+-   **Geographic Distribution in WA:** mostly Puget Sound Region and Islands; borders near with Idaho
+-   **Elevation Range:** 150-1500m
+-   **Habitat Types / Substrate Preferences:** Apple tree leaves and Juniper leaves and branches
+-   **Host Associations:** Telial Host: Eastern Red Cedar (*Juniperus virginiana*) (and other Juniper spp.); Aecial Host: Rosaceous family commonly including apples and crab apples (*Malus*), as well as hawthorn (*Crataegus*) or serviceberry (*Amelanchier*)
+
+```{r Distribution-map-WA, echo=FALSE, message=FALSE}
+
+# 1. Get records by taxon_id (Gymnosporangium-juniperi-virginianae = 121687)
+Gymnosporangium_data <- get_inat_obs(taxon_id = 121687, maxresults = 10000)
+
+# 2. Convert to sf object
+Gymnosporangium_sf <- Gymnosporangium_data %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# 3. Get WA state polygon
+wa_state <- ne_states(country = "United States of America", returnclass = "sf") %>%
+  filter(name == "Washington") %>%
+  st_transform(st_crs(Gymnosporangium_sf))
+
+# 4. Keep points inside WA
+Gymnosporangium_wa <- Gymnosporangium_sf[st_within(Gymnosporangium_sf, wa_state, sparse = FALSE), ]
+
+# 5. Plot
+ggplot() +
+  geom_sf(data = wa_state, fill = "gray95", color = "black") +
+  geom_sf(data = Gymnosporangium_wa, color = "#D97C15", alpha = 0.6, size = 6) +
+  labs( 
+    title = expression("iNaturalist Observations of " * italic("G. juniperi-virginianae") * " in Washington State"),
+    caption = "Data source: iNaturalist"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 4. Seasonality & Phenology
+
+-   **Months of Fruiting in WA:** April-June
+-   **Seasonal Notes:** Telial fruiting in spring with rainfall and stops when dry and warm. Aecial development throughout Summer and Autumn, pycniospores go dormant for winter up to 2 years, gall formation slowly develops until spring.
+
+```{r Seasonality-plot-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Make sure your date column is parsed
+Gymnosporangium_data <- Gymnosporangium_wa %>%
+  mutate(
+    observed_on = as.Date(observed_on),
+    month_num = month(observed_on),
+    month_label = month(observed_on, label = TRUE, abbr = TRUE)
+  ) %>%
+  filter(!is.na(month_num))
+
+# Aggregate by month
+monthly_counts <- Gymnosporangium_data %>%
+  group_by(month_num, month_label) %>%
+  summarize(observations = n(), .groups = "drop")
+
+# Make sure months are in calendar order
+monthly_counts <- monthly_counts %>%
+  arrange(month_num)
+
+#make proportional
+monthly_counts <- monthly_counts %>%
+  mutate(freq = observations / sum(observations))
+
+# Plot
+ggplot(monthly_counts, aes(x = month_num, y = freq)) +
+  geom_area(fill = "#D97C14", alpha = 0.5) +
+  geom_line(color = "#FF8000", size = 1.2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = expression("Seasonal Pattern of " * italic("Gymnosporangium juniperi-virginianae") * " (Relative Frequency)"),
+    x = "Month",
+    y = "Proportion of Observations"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 5. Ecology & Role
+
+-   **Ecological Function:** non-lethal plant pathogen, reduces host fruiting quality and yield
+-   **Substrate / Decomposition Role:** Apple tree leaves and Juniper leaves and branches
+-   **Interactions:** Host specific to Junipers (Juniperus) and Roses (Rosaceae); sporulation assisted by insects and wind
+-   **Environmental Sensitivity / Indicators:** N/A
+
+------------------------------------------------------------------------
+
+## 6. Conservation, Abundance & Threats
+
+-   **Abundance / Rarity in WA:** Uncommon, compared to East Coast region
+-   **Conservation Status (state, federal, red list):** N/A, not assessed
+-   **Threats / Pressures:** Forest fires, deforestation
+-   **Management or Monitoring Notes:** Preventive fungicides and select pruning; apple orchard transportation regulations
+
+------------------------------------------------------------------------
+
+## 7. Use / Ethnobiology / Toxicology
+
+-   **Edibility / Toxicity:** Not edible, undesirable; unstudied
+-   **Traditional / Cultural Uses:** Not useful; indigenous practices of controlled burns to regulate spread
+-   **Medicinal / Bioactive Compounds:** phenolic acids (anthocyanins, purpurogallin, flavonoids, tannins, steroids, tritepenes, alkaloids, lipophillic components
+-   **Cautions / Warnings:** None
+
+------------------------------------------------------------------------
+
+## 8. References / Further Reading
+
+-   Key Literature Sources:
+
+    <https://www.mykoweb.com/misc/Omphalina/O-III-10.pdf>
+
+-   Field Guides / Online Resources:
+
+    <https://www.inaturalist.org/taxa/121687-Gymnosporangium-juniperi-virginianae#articles-tab>
+
+    <https://www.marylandbiodiversity.com/species/12454>
+
+    <https://ohioline.osu.edu/factsheet/plpath-tree-10>
+
+    <https://www.mycobank.org/page/Name%20details%20page/name/Gymnosporangium%20juniperi-virginianae>
+
+    <https://www.gbif.org/species/2516181>
+
+    <https://micro.magnet.fsu.edu/primer/techniques/phasegallery/cedarapplerust.html>
+
+    [https://www.sciencedirect.com/science/article/pii/S0753332217339070#:\~:text=The%20extract%20reduced%20the%20level,conjugated%20to%20a%20central%20glucose).](https://www.sciencedirect.com/science/article/pii/S0753332217339070#:~:text=The%20extract%20reduced%20the%20level,conjugated%20to%20a%20central%20glucose).)
+
+------------------------------------------------------------------------
+
+## 9. Images / Illustrations
+
+-   **Fruiting Body Photos:**
+
+    ![Gall on Eastern Red Cedar (Juniper virginiana) before rain (April 2008). Photo Credit: Botond Balogh 2008](images/Botond%20Balogh%20shrivelled%20horns.jpg)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Shrivelled brown horns on gall during telial stage before rain (April 2008); Photo credit: Botond Balogh
+
+    </p>
+
+    ![Gelantinous orange horns on gall during telial stage after rain (April 2008); Photo credit: Len Burgess](images/Len%20Burgess%202008.jpg)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Gelantinous orange horns on gall during telial stage after rain (April 2008); Photo credit: Len Burgess
+
+    </p>
+
+    ![Early aecial infection of pycnia lesions](images/leaf.jpg)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Early aecial infection of pycnia lesions on underside of leaf. Photo credit: Daria McKelvey
+
+    </p>
+
+-   **Habitat Photo:**
+
+    ![Red Cedar with heavy infestation of teliohorns (early-May 2012). Photo credit: David D. Taylor](images/red%20cedar.jpg)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Red Cedar with heavy infestation of teliohorns (early-May 2012). Photo credit: David D. Taylor
+
+    </p>
+
+-   **Microscopy Photo:**
+
+    ![Two-celled teliospore under microscope (April 2008). Photo credit: Botond Balogh](images/Botond%20Balogh%20teliospore%202008.jpg)\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Two-celled teliospore under microscope (April 2008). Photo credit: Botond Balogh
+
+    </p>
+
+------------------------------------------------------------------------
+
+## 10. Other Notes & Observations
+
+-   **Questions / Uncertainties**: Not extensively studied
+-   **Fun facts:** Rust life cycles are cool! Also it only has four of the five rust spore types. Gymno=naked, sporangium=fruit body, hence the orange slick bodies! Different spp of the same genus develop various types of orange "horns," such as club-horns, cones, and finger-like appendages.
+
+------------------------------------------------------------------------

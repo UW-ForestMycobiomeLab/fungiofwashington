@@ -1,0 +1,308 @@
+---
+date: "2025-10-13"
+output:
+  html_document:
+    toc: false
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+meta <- rmarkdown::metadata
+title_text <- "Cortinarius violaceus" # manually set since we removed YAML title
+date_text <- meta$date
+```
+
+::: {style="text-align; margin-bottom: 1em;"}
+# *`r title_text`*
+
+**Date:** `r format(as.Date(date_text), "%B %d, %Y")`
+:::
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+packages <- c(
+  "rinat", "dplyr", "sf", "ggplot2",
+  "rnaturalearth", "rnaturalearthdata",
+  "lubridate", "devtools"
+)
+
+# Install any that aren't already installed
+installed <- packages %in% installed.packages()
+if (any(!installed)) {
+  install.packages(packages[!installed])
+}
+
+# Load all packages
+lapply(packages, library, character.only = TRUE)
+```
+
+------------------------------------------------------------------------
+
+## 1. Taxonomy & Nomenclature
+
+-   **Scientific Name (current):** *Cortinarius violaceus*
+
+-   **Synonyms / Former Names:** *Agaricus violaceus L.*, *Cortinarius violaceus (L.)* Fr., *Inoloma violaceum* (L. ex Fr.) Wunsche
+
+-   **Common Name(s):** Violet cort, Violet webcap, Cap Gweog Fioled (Welsh)
+
+-   **Taxonomic Authority / Citation:** (L.) Gray
+
+-   **Higher Classification (Kingdom / Phylum / Class / Order / Family):** Fungi / Basidiomycota / Agaricomycetes / Agaricales / Cortinariaceae
+
+------------------------------------------------------------------------
+
+## 2. Morphology & Identification
+
+-   **Fruiting Body Description:** The fruiting body takes the shape of a gilled mushroom that can be 4-10 cm wide and 6-15 cm tall. It has a violet cap and stipe and dark violet, blackish gills. It is generally textured with small hairs and scales.
+
+-   **Cap / Pileus Characteristics:** The cap is typically 4-10 cm across and is somewhat velvety, roughened by many hairs and small scales. It tends to crack when dry and is colored a deep blackish violet to deep purple. Unlike many other Cortinarius species, the cap is not slimy.
+
+-   **Gills / Pores / Spines / Teeth / Etc.:** The gills have an adnate attachment to the stem. They are covered by a cobwebby purple partial veil when young, but this disappears quickly. They begin as dark purple, become grayish to blackish, and end as rusty brown.
+
+-   **Stipe / Stem / Attachment / Ring / Volva / Base:** The stipe is 6-15 cm long, with a base ranging from bulbous to slightly thickened, and has a partial veil. It is somewhat hairy and is not slimy. Over time, the stem darkens deeply, indicating age.
+
+-   **Spore Print Color:** Rusty brown or cinnamon.
+
+-   **Microscopic Features:** Spores are 11.5-14.5 x 7-9 µm and are ellipsoid to amygadaliform (almond-shaped), with a moderately verrucose (warty) surface texture. The cheilocystidia (edge of gills) and pleurocystidia (face of gills) are fusoid-ventricose (spindle-shaped, wider in the middle), with a long neck. It is the only Cortinarius species with clearly defined cystidia on its gills.
+
+-   **Other Diagnostic Characters:** It is described by various sources as having a cedarwood smell, a sweet fragrance, or no distinct smell. It turns red when it comes into contact with potassium hydroxide (KOH).
+
+-   **Similar Species / Potential Confusions:**
+
+    -   Viscid violet cort (*Cortinarius iodes*)
+
+    -   Gassy webcap (*Cortinarius traganus*)
+
+    -   Silvery-violet cort (*Cortinarius alboviolaceus*)
+
+    -   Amethyst deceiver (*Laccaria amethystina*)
+
+    -   Blewit (*Clitocybe nuda*)
+
+------------------------------------------------------------------------
+
+## 3. Distribution & Habitat in Washington
+
+-   **Range (counties or regions):** Temperate areas in the Northern Hemisphere (found in both North America and Europe).
+
+-   **Geographic Distribution in WA:** Largely found to the west of the Cascade Mountains (in old-growth forests both inland and on the coast). Also sometimes found in the northeastern corner of the state (Pend Oreille County).
+
+-   **Elevation Range:** There is no definitive elevation range for the fungus itself. However, the old-growth forests it favors occur from sea level to around 4,000 feet.
+
+-   **Habitat Types / Substrate Preferences:** In Washington state, it is most often found growing in old-growth conifer forests, but it also grows in mixed woods. It grows on the ground and is often found near rotting logs.
+
+-   **Host Associations:** It is more often reported with conifers in North America and deciduous forests of broadleaf trees in Europe.
+
+```{r Distribution-map-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# 1. Get records by taxon_id (Hygrocybe singerii = 118316)
+violetcort_data <- get_inat_obs(taxon_id = 124344, maxresults = 10000)
+
+# 2. Convert to sf object
+violetcort_sf <- violetcort_data %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# 3. Get WA state polygon
+wa_state <- ne_states(country = "United States of America", returnclass = "sf") %>%
+  filter(name == "Washington") %>%
+  st_transform(st_crs(violetcort_sf))
+
+# 4. Keep points inside WA
+violetcort_wa <- violetcort_sf[st_within(violetcort_sf, wa_state, sparse = FALSE), ]
+
+# 5. Plot
+ggplot() +
+  geom_sf(data = wa_state, fill = "gray95", color = "black") +
+  geom_sf(data = violetcort_wa, color = "darkorchid4", alpha = 0.6, size = 2) +
+  labs(
+    title = "iNaturalist Observations of Cortinarius violaceus in Washington State",
+    caption = "Data source: iNaturalist"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 4. Seasonality & Phenology
+
+-   **Months of Fruiting in WA:** June through December.
+
+-   **Seasonal Notes:** Peaks in October and prefers moist soil.
+
+```{r Seasonality-plot-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Make sure your date column is parsed
+violetcort_data <- violetcort_wa %>%
+  mutate(
+    observed_on = as.Date(observed_on),
+    month_num = month(observed_on),
+    month_label = month(observed_on, label = TRUE, abbr = TRUE)
+  ) %>%
+  filter(!is.na(month_num))
+
+# Aggregate by month
+monthly_counts <- violetcort_data %>%
+  group_by(month_num, month_label) %>%
+  summarize(observations = n(), .groups = "drop")
+
+# Make sure months are in calendar order
+monthly_counts <- monthly_counts %>%
+  arrange(month_num)
+
+#make proportional
+monthly_counts <- monthly_counts %>%
+  mutate(freq = observations / sum(observations))
+
+# Plot
+ggplot(monthly_counts, aes(x = month_num, y = freq)) +
+  geom_area(fill = "orchid4", alpha = 0.5) +
+  geom_line(color = "purple4", size = 1.2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = expression("Seasonal Pattern of " * italic("Cortinarius violaceus") * " (Relative Frequency)"),
+    x = "Month",
+    y = "Proportion of Observations"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 5. Ecology & Role
+
+-   **Ecological Function:** Forms ectomycorrhizal relationships with hardwoods or conifers.
+
+-   **Substrate / Decomposition Role:** It is not known as a saprotrophic mushroom.
+
+-   **Interactions:** As an ectomycorrhizal fungus, it enhances nutrient and water uptake for host trees while receiving carbohydrates in return.
+
+-   **Environmental Sensitivity / Indicators:** Indicates healthy old-growth forests.
+
+------------------------------------------------------------------------
+
+## 6. Conservation, Abundance & Threats
+
+-   **Abundance / Rarity in WA:** Commonly encountered in WA, but in small numbers.
+
+-   **Conservation Status (state, federal, red list):** Not of concern.
+
+-   **Threats / Pressures:** Currently, there are no specific threats to this species. However, it is assumed that when old-growth forests are impacted, this species will be as well.
+
+-   **Management or Monitoring Notes:** Requires conservation of mature forest stands, avoidance of clearcutting and soil compaction, and maintenance of leaf litter, coarse woody debris (CWD), and natural hydrology.
+
+------------------------------------------------------------------------
+
+## 7. Use / Ethnobiology / Toxicology
+
+-   **Edibility / Toxicity:** They are considered edible, but not choice, and so are not recommended for consumption. They may taste bitter when cooked.
+
+-   **Traditional / Cultural Uses:** There are currently no documented uses for this species for culinary or medicinal uses.
+
+-   **Medicinal / Bioactive Compounds:** It likely contains some compounds with anti-inflammatory and antioxidant properties, but more research is needed.
+
+-   **Cautions / Warnings:** There are no serious warnings for consumption or use of this species. However, it has some lookalikes within the Cortinarius family that are toxic.
+
+------------------------------------------------------------------------
+
+## 8. References / Further Reading
+
+-   Key Literature Sources:
+    -   All That the Rain Promises, and More… (David Arora)
+    -   Mushrooms Demystified (David Arora)
+    -   Mushrooms of Cascadia (Noah Siegel and Christian Schwarz)\
+-   Field Guides / Online Resources:
+    -   <https://www.mushroomexpert.com/cortinarius_violaceus.html>
+    -   <https://species.nbnatlas.org/species/NHMSYS0001479566>
+    -   <https://burkeherbarium.org/imagecollection/taxon.php?Taxon=Cortinarius%20violaceus>
+    -   <https://www.inaturalist.org/taxa/124344-Cortinarius-violaceus>
+    -   <https://pmc.ncbi.nlm.nih.gov/articles/PMC10647524/>
+
+------------------------------------------------------------------------
+
+## 9. Images / Illustrations
+
+-   **Fruiting Body Photos:**
+
+    ![]()
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Figure 1: Five Cortinarius violaceus fruiting bodies in various stages of life.
+
+    Photo credit: Federico Calledda
+
+    </p>
+
+    ![Underside / Hymenium]()
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Figure 2: A young specimen with some of its cobwebby partial veil still visible.
+
+    Photo credit: Kavya Rao
+
+    </p>
+
+    ![Underside / Hymenium]()
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Figure 3: One of the authors (Kavya) and her partner posing with a lovely pair of violet webcaps!
+
+    Photo credit: Kavya Rao
+
+    </p>
+
+-   **Habitat Photo:**
+
+    ![Habitat]()
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Figure 4: Cortinarius violaceus growing among moss.
+
+    Photo credit: Steve Trudell
+
+    </p>
+
+    ![Habitat]()
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Figure 5: Cortinarius violaceus growing on the forest floor.
+
+    Photo credit: Steve Trudell
+
+    </p>
+
+-   **Microscopy Photo:**
+
+    ![Microscopy]()
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Figure 6: Spores of Cortinarius Violaceus next to a scale.
+
+    Photo credit: Michael Kuo
+
+    </p>
+
+------------------------------------------------------------------------
+
+## 10. Other Notes & Observations
+
+-   Field Notes / Observations:
+
+    -   I (Kavya) have always found this fungus growing either by itself or in small groups of 3-5.
+
+-   Questions / Uncertainties:
+
+    -   The description of the smell is somewhat different between sources (cedar wood, vague sweetness, or no distinctive smell).
+
+-   Fun facts
+
+    -   Its fruiting body contains around 100 times more iron than most other fungal species.
+
+------------------------------------------------------------------------

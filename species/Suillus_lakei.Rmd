@@ -1,0 +1,237 @@
+---
+date: "2025-10-13"
+output:
+  html_document:
+    toc: false
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+meta <- rmarkdown::metadata
+title_text <- "Suillus lakei" # manually set since we removed YAML title
+date_text <- meta$date
+```
+
+::: {style="text-align; margin-bottom: 1em;"}
+# *`r title_text`*
+
+**Date:** `r format(as.Date(date_text), "%B %d, %Y")`
+:::
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+packages <- c(
+  "rinat", "dplyr", "sf", "ggplot2",
+  "rnaturalearth", "rnaturalearthdata",
+  "lubridate", "devtools"
+)
+
+# Install any that aren't already installed
+
+#installed <- packages %in% installed.packages()
+#if (any(!installed)) {
+#  install.packages(packages[!installed])
+#}
+
+# Load all packages
+lapply(packages, library, character.only = TRUE)
+```
+
+------------------------------------------------------------------------
+
+## 1. Taxonomy & Nomenclature
+
+-   **Scientific Name (current):** *Suillus lakei*
+-   **Synonyms / Former Names:** *Boletus lakei, Boletinus lakei*
+-   **Common Name(s):** matte Jack, Lake's bolete, western painted Suillus, Lake's slippery cap.
+-   **Taxonomic Authority / Citation:** (Murill) A.H. Sm & Thiers
+-   **Higher Classification (Kingdom / Phylum / Class / Order / Family):** Kingdom Fungi, Phylum Basidiomycota, Class Agaricomycetes, Order Boletales, Family Suillaceae
+
+------------------------------------------------------------------------
+
+## 2. Morphology & Identification
+
+-   **Fruiting Body Description:** (size, shape, color, texture)
+-   **Cap / Pileus Characteristics:** Cap 4-12 cm, broad and convex. Shape changes over time, with the margin incurved when younger and nearly plane with age. Surface color brown with scaly texture, flesh color light yellow, subcuticle yellow.
+-   **Gills / Pores / Spines / Teeth / Etc.:** Pores that change in color over time, aging into a darker brown color. Tubes are adnate or decurrent on hymenium.
+-   **Stipe / Stem / Attachment / Ring / Volva / Base:** 3-7 cm in height, 1.5-2.5 cm thick (Mykoweb, 2021). Veil thin and may leave remnants on the cap, and may form larger veil on the stipe. Stipe yellow at the top, red-brown lower down.
+-   **Spore Print Color:** Brown
+-   **Microscopic Features (if available):** spores 7.5-10 by 3-4 µm, subellipsoid and smooth shape (Mykoweb, 2021). (spore size & shape, cystidia, etc.)
+-   **Other Diagnostic Characters:** Strong odor. Flesh occasionally turns pink when cut. Flesh turns blue when cut at the base. Shape of cap or color of different parts may change over time.
+-   **Similar Species / Potential Confusions:** *S. spraguei, S. cavipes, S. ochraceoroseus, S. ponderosus, S. cauerulescens, S. decipiens.*
+
+------------------------------------------------------------------------
+
+## 3. Distribution & Habitat in Washington
+
+-   **Range (counties or regions):** Primarily the Rocky Mountains and the Northwest United States/ Southwest Canada.
+-   **Geographic Distribution in WA:** Eastern and Western Washington, avoiding the inner (hotter, drier) counties. More prevalent along the coast of Washington and up into Vancouver island.
+-   **Elevation Range:** No clear elevation range. However, can be assumed that it follows Douglas fir elevation ranges - from sea level to 10,700 feet.
+-   **Habitat Types / Substrate Preferences:** Prefers poor, exposed soil, such as in campgrounds or road banks (iNaturalist). Will be close to the roots of Douglas fir trees.
+-   **Host Associations (if applicable):** Forms ectomycorrhizae with Douglas fir (*Pseudotsuga menziesii*).
+
+```{r Distribution-map-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# 1. Get records by taxon_id (S. lakei = 118316)
+lakei_data <- get_inat_obs(taxon_id = 118159, maxresults = 1000)
+
+# 2. Convert to sf object
+lakei_sf <- lakei_data %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# 3. Get WA state polygon
+wa_state <- ne_states(country = "United States of America", returnclass = "sf") %>%
+  filter(name == "Washington") %>%
+  st_transform(st_crs(lakei_sf))
+
+# 4. Keep points inside WA
+lakei_wa <- lakei_sf[st_within(lakei_sf, wa_state, sparse = FALSE), ]
+
+# 5. Plot
+ggplot() +
+  geom_sf(data = wa_state, fill = "gray95", color = "black") +
+  geom_sf(data = lakei_wa, color = "purple", alpha = 0.6, size = 2) +
+  labs(
+    title = "iNaturalist Observations of Suillus lakei in Washington State",
+    caption = "Data source: iNaturalist"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 4. Seasonality & Phenology
+
+-   **Months of Fruiting in WA:** Late summer and autumn, potentially even later.
+-   **Seasonal Notes:** Based on iNaturalist images, fruits the most in October. Rain may alter appearance of cap surface, making it more sticky and slimy. Age may smoothen mushroom from scaly texture over time.
+
+```{r Seasonality-plot-WA, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Make sure your date column is parsed
+lakei_data <- lakei_wa %>%
+  mutate(
+    observed_on = as.Date(observed_on),
+    month_num = month(observed_on),
+    month_label = month(observed_on, label = TRUE, abbr = TRUE)
+  ) %>%
+  filter(!is.na(month_num))
+
+# Aggregate by month
+monthly_counts <- lakei_data %>%
+  group_by(month_num, month_label) %>%
+  summarize(observations = n(), .groups = "drop")
+
+# Make sure months are in calendar order
+monthly_counts <- monthly_counts %>%
+  arrange(month_num)
+
+#make proportional
+monthly_counts <- monthly_counts %>%
+  mutate(freq = observations / sum(observations))
+
+# Plot
+ggplot(monthly_counts, aes(x = month_num, y = freq)) +
+  geom_area(fill = "orchid4", alpha = 0.5) +
+  geom_line(color = "purple4", size = 1.2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = expression("Seasonal Pattern of " * italic("Suillus lakei") * " (Relative Frequency)"),
+    x = "Month",
+    y = "Proportion of Observations"
+  ) +
+  theme_classic()
+```
+
+------------------------------------------------------------------------
+
+## 5. Ecology & Role
+
+-   **Ecological Function:** Mycorrhizal
+-   **Substrate / Decomposition Role:** Typically on the ground near or under Douglas fir trees; *Suillus lakei* colonizes root structures to live. This is a mutualistic relationship with these trees.
+-   **Interactions:** Forms ectomycorrhizae with Douglas fir, and is only present in areas where there are Douglas Fir.
+-   **Environmental Sensitivity / Indicators:** As it associates with Douglas fir trees (*Psedotsuga menziesii*), a reduction in these species could cause a corresponding reduction in *S. lakei* populations. Is often found alongside *Gomphidius subroseus* on or near Douglas firs.
+
+------------------------------------------------------------------------
+
+## 6. Conservation, Abundance & Threats
+
+-   **Abundance / Rarity in WA:** Indigenous to this area! Fairly common, one of the most common boletes found in nearby states (Montana, Idaho).
+-   **Conservation Status (state, federal, red list):** No concern in the United States. Listed as endangered in the Czech Republic.
+-   **Threats / Pressures:** No specific pressures, besides those that would affect Douglas fir, such as root rot, drought, or insect-related diseases. These would only significantly affect *Suillus lakei* if Douglas fir populations were majorly reduced.
+-   **Management or Monitoring Notes:** Only reason for endangered status in the Czech Republic is due to the ornamental nature of Douglas fir, leading to little wild opportunity for *Suillus lakei* to flourish.
+
+------------------------------------------------------------------------
+
+## 7. Use / Ethnobiology / Toxicology
+
+-   **Edibility / Toxicity: Edible!** But not very tasty nor a good texture.
+-   **Traditional / Cultural Uses:** None listed or described.
+-   **Medicinal / Bioactive Compounds:** Mushrooms have antimicrobial activity and contain alkaloids and tannins (iNaturalist, 2025).
+-   **Cautions / Warnings:** May taste bad!!
+
+------------------------------------------------------------------------
+
+## 8. References / Further Reading
+
+**Key Literature Sources:**
+
+-   Wood, Michael. "California Fungi-Suillus lakei" Mykoweb, 2021, <https://www.mykoweb.com/CAF/species/Suillus_lakei.html>
+-   "Western Painted Suillus (Suillus lakei) iNaturalist, iNaturalist Network, 2025, <https://www.inaturalist.org/taxa/118159-Suillus-lakei#articles-tab>
+-   "Suillus lakei (Murill) A.H. Sm. & Thiers" The Global Fungal Red List, 2018, <https://redlist.info/iucn/species_view/339853>
+
+**Field Guides / Online Resources:** Mykoweb, iNaturalist
+
+------------------------------------------------------------------------
+
+## 9. Images / Illustrations
+
+-   **Fruiting Body Photos:**
+
+    ![]()\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description: Image of cap of Suillus lakei Photo credit: miahwhiteaker on iNaturalist
+
+    </p>
+
+    ![]()\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description: Underside and hymenium of Suillus lakei Photo credit: edwardrice on iNaturalist
+
+    </p>
+
+-   **Habitat Photo:**
+
+    ![]()\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description: 2 examples of Suillus lakei in habitat Photo credit: chanterellerin on iNaturalist
+
+    </p>
+
+-   **Microscopy Photo :**
+
+    ![]()\
+
+    <p style="font-size:0.8em; text-align:center;">
+
+    Description: Photo of *Suillus lakei* basidiospores at 10 μm Photo credit: B. Assyov on boletales.com (boletales.com/genera/suillus/s-lakei/):
+
+    </p>
+
+------------------------------------------------------------------------
+
+## 10. Other Notes & Observations
+
+-   **Fun Facts:**
+    -   If not for the distribution of Douglas fir to new regions, this species would most likely not be present anywhere outside of the Douglas fir's natural range. The prescence of *Suillus lakei* in New Zealand is a good example of this phenomena.
+    -   The main difference between this species and its lookalikes is the trees that it is present on: tree species designates a species difference. However, all of these other species are edible as well, despite retaining the displeasurable taste and texture.
+    -   Was initially named incorrectly, leading to the original discoverers name in parentheses before the names of the researchers who did the modern reassessment to rename it.
+    -   In Washington, there are always significant mushroom sighting highs in October, according to iNaturalist. This goes slightly against the Mykoweb description that the Pacific Northwest may have these mushrooms sprouting later in the season, or maybe this distinction has changed since the initial writing of that article.
+
+------------------------------------------------------------------------
