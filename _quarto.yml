@@ -1,6 +1,6 @@
 project:
   type: website
-  output-dir: _site
+  output-dir: docs  # <-- change from _site to docs
 
 website:
   title: "Fungi of Washington"
