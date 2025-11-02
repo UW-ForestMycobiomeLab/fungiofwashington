@@ -1,0 +1,60 @@
+/* --- Base Typography --- */
+body {
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+  background-color: #faf9f7;
+  text-align: left;
+}
+
+h1, h2, h3 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+}
+
+/* --- Banner Header --- */
+.quarto-about-title {
+  background: linear-gradient(135deg, #355c7d, #6c5b7b, #c06c84);
+  color: white !important;
+  padding: 2rem;
+  border-radius: 0.75rem;
+  text-align: left;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+.quarto-about-title h1 {
+  font-size: 2.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.quarto-about-title p {
+  font-size: 1.1rem;
+  color: #f3f1f1;
+}
+
+/* --- Links --- */
+a {
+  color: #6c5b7b;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #c06c84;
+  text-decoration: underline;
+}
+
+/* --- Section Styling --- */
+section {
+  background-color: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+  margin-bottom: 2rem;
+}
+
+/* --- Quotes --- */
+blockquote {
+  font-style: italic;
+  color: #555;
+  border-left: 4px solid #c06c84;
+  padding-left: 1rem;
+}
